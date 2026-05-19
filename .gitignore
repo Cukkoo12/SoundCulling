@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+
+# Runtime
+run/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CLAUDE
+CLAUDE.md
+CLAUDE-*.md
