@@ -1,0 +1,36 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '2.0.141'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base { archivesName = project.archives_base_name }
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+neoForge {
+    version = project.neo_version
+    runs {
+        client { client() }
+        server { server(); programArguments = ['--nogui'] }
+    }
+    mods {
+        soundculling {
+            sourceSet(project.sourceSets.main)
+        }
+    }
+}
+
+dependencies {
+    // NeoForge dependency is handled by MDG
+}
+
+processResources {
+    inputs.property "version", project.version
+    filteringCharset = "UTF-8"
+    filesMatching("META-INF/neoforge.mods.toml") {
+        expand "version": project.version
+    }
+}
