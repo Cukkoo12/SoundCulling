@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "soundculling",
   "version": "${version}",
-  "name": "Dynamic Sound Culling",
+  "name": "Sound Culling",
   "description": "Automatically suppresses repetitive sounds from crowded areas. Protects your ears near cow farms, spawner rooms, and other noisy entity clusters.",
   "authors": ["Cukkoo"],
   "contact": { "sources": "https://github.com/Cukkoo12/SoundCulling" },

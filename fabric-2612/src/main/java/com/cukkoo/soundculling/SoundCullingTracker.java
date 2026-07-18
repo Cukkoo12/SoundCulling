@@ -5,6 +5,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -23,6 +24,7 @@ public final class SoundCullingTracker {
     private static final Map<String, Deque<Long>> REGION_TIMESTAMPS = new HashMap<>();
 
     private static long currentTick = 0;
+    private static int totalDampened = 0;
     private static int totalCulled = 0;
 
     private SoundCullingTracker() {}
@@ -33,7 +35,8 @@ public final class SoundCullingTracker {
         if (currentTick % 100 == 0) {
             cleanOldEntries();
             if (SoundCulling.getConfig() != null && SoundCulling.getConfig().debugLogging) {
-                SoundCulling.LOGGER.info("[SoundCullingDebug] Tick: {}, Active Sounds: {}, Regions: {}, Total Culled: {}", currentTick, SOUND_TIMESTAMPS.size(), REGION_TIMESTAMPS.size(), totalCulled);
+                SoundCulling.LOGGER.info("[SoundCullingDebug] Tracked sounds: {}, regions: {}, dampened: {}, culled: {}",
+                        SOUND_TIMESTAMPS.size(), REGION_TIMESTAMPS.size(), totalDampened, totalCulled);
             }
         }
     }
@@ -52,11 +55,6 @@ public final class SoundCullingTracker {
     /** Returns the volume multiplier (0.0f = fully culled, 1.0f = no cull/normal). */
     public static float getVolumeMultiplier(Identifier soundId, SoundSource category, double x, double y, double z) {
         SoundCullingConfig config = SoundCulling.getConfig();
-
-        // Positionless sounds (music, UI) are never culled
-        if (x == 0.0 && y == 0.0 && z == 0.0) {
-            return 1.0f;
-        }
 
         int regionX = (int) Math.floor(x / config.regionSize);
         int regionY = (int) Math.floor(y / config.regionSize);
@@ -80,57 +78,39 @@ public final class SoundCullingTracker {
         }
         int regionCount = regionTimes.size();
 
-        // Direction-based calculation
-        boolean isBehind = false;
-        Minecraft mc = Minecraft.getInstance();
-        LocalPlayer player = mc.player;
-        if (player != null) {
-            float pitch = player.getXRot();
-            float yaw = player.getYRot();
-            float pitchRad = pitch * ((float) Math.PI / 180.0F);
-            float yawRad = yaw * ((float) Math.PI / 180.0F);
+        int limit = getCategoryLimit(category, config);
+        boolean categoryHardLimit = (long) count >= (long) limit * 2L;
+        boolean regionHardLimit = (long) regionCount >= (long) config.maxTotalPerRegion * 2L;
+        boolean overlapLimitReached = count >= limit || regionCount >= config.maxTotalPerRegion;
 
-            double lookX = -Math.sin(yawRad) * Math.cos(pitchRad);
-            double lookY = -Math.sin(pitchRad);
-            double lookZ = Math.cos(yawRad) * Math.cos(pitchRad);
-
-            double dx = x - player.getX();
-            double dy = y - player.getEyeY();
-            double dz = z - player.getZ();
-            double distSq = dx * dx + dy * dy + dz * dz;
-            if (distSq > 0.001) {
-                double dist = Math.sqrt(distSq);
-                double dot = (dx / dist) * lookX + (dy / dist) * lookY + (dz / dist) * lookZ;
-                if (dot < 0.0) {
-                    isBehind = true;
+        float multiplier;
+        if (categoryHardLimit || regionHardLimit) {
+            multiplier = 0.0f;
+        } else if (overlapLimitReached) {
+            boolean isBehind = false;
+            Minecraft mc = Minecraft.getInstance();
+            LocalPlayer player = mc.player;
+            if (player != null) {
+                double dx = x - player.getX();
+                double dy = y - player.getEyeY();
+                double dz = z - player.getZ();
+                double distSq = dx * dx + dy * dy + dz * dz;
+                if (distSq > 0.001) {
+                    Vec3 look = player.getLookAngle();
+                    isBehind = dx * look.x + dy * look.y + dz * look.z < 0.0;
                 }
             }
-        }
-
-        int limit = getCategoryLimit(category, config);
-        int activeLimit = isBehind ? Math.max(1, limit / 2) : limit;
-
-        float multiplier = 1.0f;
-
-        if (count >= limit * 2) {
-            multiplier = 0.0f;
-        } else if (count >= activeLimit) {
             multiplier = isBehind ? 0.07f : 0.15f;
-        } else if (isBehind) {
-            multiplier = 0.5f;
-        }
-
-        if (multiplier > 0.0f) {
-            if (regionCount >= config.maxTotalPerRegion * 2) {
-                multiplier = 0.0f;
-            } else if (regionCount >= config.maxTotalPerRegion) {
-                multiplier = Math.min(multiplier, isBehind ? 0.07f : 0.15f);
-            }
+        } else {
+            multiplier = 1.0f;
         }
 
         if (multiplier > 0.0f) {
             soundTimes.addLast(currentTick);
             regionTimes.addLast(currentTick);
+            if (multiplier < 1.0f) {
+                totalDampened++;
+            }
         } else {
             totalCulled++;
         }
@@ -162,7 +142,12 @@ public final class SoundCullingTracker {
         return totalCulled;
     }
 
+    public static int getTotalDampened() {
+        return totalDampened;
+    }
+
     public static void resetStats() {
+        totalDampened = 0;
         totalCulled = 0;
     }
 }

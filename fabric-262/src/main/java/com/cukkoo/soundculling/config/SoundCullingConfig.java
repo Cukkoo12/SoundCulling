@@ -19,9 +19,6 @@ public class SoundCullingConfig {
     private static final Path CONFIG_PATH = FabricLoader.getInstance()
             .getConfigDir().resolve("soundculling.json");
 
-    /** Max identical sounds from one region within the time window. */
-    public int maxSoundsPerRegion = 3;
-
     /** Max total sounds from one region (all types combined). */
     public int maxTotalPerRegion = 6;
 
@@ -63,8 +60,7 @@ public class SoundCullingConfig {
                 SoundCullingConfig cfg = new Gson().fromJson(
                         Files.readString(CONFIG_PATH), SoundCullingConfig.class);
                 if (cfg != null) {
-                    if (cfg.enabledCategories == null) cfg.enabledCategories = new ArrayList<>();
-                    if (cfg.whitelistedSounds == null) cfg.whitelistedSounds = new ArrayList<>();
+                    cfg.validateAndClamp();
                     return cfg;
                 }
             }
@@ -77,11 +73,58 @@ public class SoundCullingConfig {
     }
 
     public void save() {
+        validateAndClamp();
         try {
             Files.writeString(CONFIG_PATH,
                     new GsonBuilder().setPrettyPrinting().create().toJson(this));
         } catch (Exception e) {
             SoundCulling.LOGGER.warn("[SoundCulling] Config save failed", e);
+        }
+    }
+
+    public void validateAndClamp() {
+        boolean sanitized = false;
+
+        int clampedMaxTotal = Math.max(1, Math.min(100, maxTotalPerRegion));
+        int clampedWindow = Math.max(5, Math.min(200, windowTicks));
+        int clampedHostile = Math.max(1, Math.min(50, limitHostile));
+        int clampedNeutral = Math.max(1, Math.min(50, limitNeutral));
+        int clampedBlock = Math.max(1, Math.min(50, limitBlock));
+        int clampedAmbient = Math.max(1, Math.min(50, limitAmbient));
+        int clampedDefault = Math.max(1, Math.min(50, limitDefault));
+        double clampedRegion = Double.isFinite(regionSize)
+                ? Math.max(2.0, Math.min(64.0, regionSize))
+                : 16.0;
+
+        sanitized |= maxTotalPerRegion != clampedMaxTotal;
+        sanitized |= windowTicks != clampedWindow;
+        sanitized |= limitHostile != clampedHostile;
+        sanitized |= limitNeutral != clampedNeutral;
+        sanitized |= limitBlock != clampedBlock;
+        sanitized |= limitAmbient != clampedAmbient;
+        sanitized |= limitDefault != clampedDefault;
+        sanitized |= Double.compare(regionSize, clampedRegion) != 0;
+
+        maxTotalPerRegion = clampedMaxTotal;
+        windowTicks = clampedWindow;
+        regionSize = clampedRegion;
+        limitHostile = clampedHostile;
+        limitNeutral = clampedNeutral;
+        limitBlock = clampedBlock;
+        limitAmbient = clampedAmbient;
+        limitDefault = clampedDefault;
+
+        if (whitelistedSounds == null) {
+            whitelistedSounds = new ArrayList<>();
+            sanitized = true;
+        }
+        if (enabledCategories == null) {
+            enabledCategories = new ArrayList<>();
+            sanitized = true;
+        }
+
+        if (sanitized) {
+            SoundCulling.LOGGER.warn("[SoundCulling] Invalid config values were clamped to supported ranges.");
         }
     }
 }
