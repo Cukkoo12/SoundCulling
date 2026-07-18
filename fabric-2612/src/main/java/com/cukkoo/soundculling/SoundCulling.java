@@ -17,8 +17,8 @@ public class SoundCulling implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         config = SoundCullingConfig.load();
-        LOGGER.info("[SoundCulling] Initialized — max {}/sound, max {}/region total, window {} ticks, region {}blocks",
-                config.maxSoundsPerRegion, config.maxTotalPerRegion,
+        LOGGER.info("[SoundCulling] Initialized — default limit {}, max {}/region total, window {} ticks, region {} blocks",
+                config.limitDefault, config.maxTotalPerRegion,
                 config.windowTicks, config.regionSize);
 
         // Her tick'te tracker'ı güncelle

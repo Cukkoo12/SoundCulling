@@ -21,11 +21,19 @@ public class SoundEngineMixin {
 
     @Inject(method = "play", at = @At("HEAD"), cancellable = true)
     private void soundculling$onPlay(SoundInstance sound, CallbackInfoReturnable<SoundEngine.PlayResult> cir) {
+        if (sound instanceof DampenableSoundInstance dampenableSound) {
+            dampenableSound.soundculling$setVolumeMultiplier(1.0f);
+        }
+
         SoundCullingConfig config = SoundCulling.getConfig();
         if (config == null) return;
 
+        if (sound.isRelative()) return;
+
         Identifier soundId = sound.getIdentifier();
         SoundSource category = sound.getSource();
+        if (category == SoundSource.MUSIC) return;
+
         double x = sound.getX();
         double y = sound.getY();
         double z = sound.getZ();
@@ -43,22 +51,12 @@ public class SoundEngineMixin {
             }
         }
 
-        // --- Culling kontrolü ---
-        if (config.debugLogging) {
-            SoundCulling.LOGGER.info("[SoundCullingDebug] play: {}, pos: ({}, {}, {}), cat: {}", soundIdStr, x, y, z, category.getName());
-        }
         float multiplier = SoundCullingTracker.getVolumeMultiplier(soundId, category, x, y, z);
         if (multiplier == 0.0f) {
-            if (config.debugLogging) {
-                SoundCulling.LOGGER.info("[SoundCullingDebug] CULLED sound: {}", soundIdStr);
-            }
             cir.setReturnValue(SoundEngine.PlayResult.NOT_STARTED);
         } else if (multiplier < 1.0f) {
-            if (config.debugLogging) {
-                SoundCulling.LOGGER.info("[SoundCullingDebug] DAMPENED sound: {} by multiplier: {}", soundIdStr, multiplier);
-            }
-            if (sound instanceof DampenableSoundInstance) {
-                ((DampenableSoundInstance) sound).soundculling$setVolumeMultiplier(multiplier);
+            if (sound instanceof DampenableSoundInstance dampenableSound) {
+                dampenableSound.soundculling$setVolumeMultiplier(multiplier);
             }
         }
     }

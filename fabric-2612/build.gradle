@@ -10,6 +10,14 @@ base {
     archivesName = project.archives_base_name
 }
 
+configurations {
+    modCompileOnly
+    modLocalRuntime
+}
+
+configurations.compileOnly.extendsFrom(configurations.modCompileOnly)
+configurations.localRuntime.extendsFrom(configurations.modLocalRuntime)
+
 repositories {
     mavenCentral()
     maven { url = "https://api.modrinth.com/maven" }
@@ -20,7 +28,8 @@ dependencies {
     // mappings satırı YOK — 26.1.x obfuscated değil
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-    compileOnly "maven.modrinth:modmenu:18.0.0"
+    modCompileOnly "maven.modrinth:modmenu:${project.modmenu_version}"
+    modLocalRuntime "maven.modrinth:modmenu:${project.modmenu_version}"
 }
 
 processResources {

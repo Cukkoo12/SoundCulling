@@ -86,7 +86,6 @@ Configuration values are stored inside `config/soundculling.json`. You can edit 
 
 | Parameter | Default | Description |
 |---|---|---|
-| `maxSoundsPerRegion` | `3` | Maximum identical sound instances allowed inside a single region during the window. |
 | `maxTotalPerRegion` | `6` | Maximum total combined sounds of any type allowed inside a single region. |
 | `windowTicks` | `20` | Evaluation time window in game ticks (20 ticks = 1 second). |
 | `regionSize` | `16.0` | Region boundary size in blocks (16.0 = 1 chunk). |
@@ -95,7 +94,7 @@ Configuration values are stored inside `config/soundculling.json`. You can edit 
 | `limitBlock` | `5` | Sound limit for blocks, machinery, and spawners. |
 | `limitAmbient` | `4` | Sound limit for ambient environment sound cues. |
 | `limitDefault` | `3` | Default fallback limit for other sound categories. |
-| `debugLogging` | `false` | Enables real-time culling information logging to the console. |
+| `debugLogging` | `false` | Enables an aggregated culling summary in the console every 100 ticks. |
 
 ---
 
@@ -104,7 +103,7 @@ Configuration values are stored inside `config/soundculling.json`. You can edit 
 You can also control settings and inspect culling statistics dynamically using in-game chat commands:
 
 * `/soundculling` — Displays current mod limits, region settings, and total culled sound statistics for the session.
-* `/soundculling limit <n>` — Dynamically adjusts the default sound instance limit.
+* `/soundculling limit <n>` — Dynamically adjusts the default category limit.
 * `/soundculling total <n>` — Dynamically adjusts the combined regional limit.
 
 ---

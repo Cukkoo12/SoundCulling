@@ -4,7 +4,6 @@ import com.cukkoo.soundculling.SoundCulling;
 import com.cukkoo.soundculling.SoundCullingTracker;
 import com.cukkoo.soundculling.config.SoundCullingConfig;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.DoubleArgumentType;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.minecraft.network.chat.Component;
@@ -22,8 +21,8 @@ public class SoundCullingCommands {
                     .executes(ctx -> {
                         SoundCullingConfig cfg = SoundCulling.getConfig();
                         ctx.getSource().sendFeedback(Component.literal("")
-                                .append(Component.literal("§6§lDynamic Sound Culling\n"))
-                                .append(Component.literal("§e  Sound Limit: §f" + cfg.maxSoundsPerRegion + "\n"))
+                                .append(Component.literal("§6§lSound Culling\n"))
+                                .append(Component.literal("§e  Default Limit: §f" + cfg.limitDefault + "\n"))
                                 .append(Component.literal("§e  Region Total: §f" + cfg.maxTotalPerRegion + "\n"))
                                 .append(Component.literal("§e  Time Window: §f" + cfg.windowTicks + " ticks §7(" + String.format("%.1f", cfg.windowTicks / 20.0) + "s)\n"))
                                 .append(Component.literal("§e  Region Size: §f" + (int) cfg.regionSize + " blocks\n"))
@@ -37,9 +36,9 @@ public class SoundCullingCommands {
                             .then(ClientCommands.argument("value", IntegerArgumentType.integer(1, 50))
                                     .executes(ctx -> {
                                         int val = IntegerArgumentType.getInteger(ctx, "value");
-                                        SoundCulling.getConfig().maxSoundsPerRegion = val;
+                                        SoundCulling.getConfig().limitDefault = val;
                                         SoundCulling.getConfig().save();
-                                        ctx.getSource().sendFeedback(Component.literal("§a[SoundCulling] §fSound limit set to §e" + val));
+                                        ctx.getSource().sendFeedback(Component.literal("§a[SoundCulling] §fDefault limit set to §e" + val));
                                         return 1;
                                     })
                             )

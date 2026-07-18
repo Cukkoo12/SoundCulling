@@ -32,7 +32,7 @@ public class SoundCullingConfigScreen extends Screen {
     private int limitDefault;
 
     public SoundCullingConfigScreen(Screen parent) {
-        super(Component.literal("Dynamic Sound Culling"));
+        super(Component.literal("Sound Culling"));
         this.parent = parent;
         this.config = SoundCulling.getConfig();
         
@@ -195,8 +195,8 @@ public class SoundCullingConfigScreen extends Screen {
         int rowH = 22;
 
         // Headers
-        extractor.text(this.font, Component.literal("Dynamic Sound Culling"),
-                cx - this.font.width("Dynamic Sound Culling") / 2, 8, 0xFFFFAA00);
+        extractor.text(this.font, Component.literal("Sound Culling"),
+                cx - this.font.width("Sound Culling") / 2, 8, 0xFFFFAA00);
         extractor.text(this.font, Component.literal("Configuration Panel"),
                 cx - this.font.width("Configuration Panel") / 2, 20, 0xFF888888);
 
@@ -257,10 +257,10 @@ public class SoundCullingConfigScreen extends Screen {
         extractor.text(this.font, Component.literal(defaultVal), rightColX + 114 - this.font.width(defaultVal) / 2, rightStartY + rowH * 4 + 4, 0xFFFFFFFF);
 
         // --- Bottom Stats ---
-        int sepY = this.height - 42;
+        int sepY = this.height - 32;
         extractor.horizontalLine(cx - 155, cx + 161, sepY, 0xFF444444);
 
-        int statsY = sepY + 5;
+        int statsY = sepY - 16;
         String statsText = "Session Culled: " + SoundCullingTracker.getTotalCulled() + " sounds";
         extractor.text(this.font, Component.literal(statsText),
                 cx - this.font.width(statsText) / 2, statsY, 0xFF81C784);
@@ -268,7 +268,8 @@ public class SoundCullingConfigScreen extends Screen {
 
     @Override
     public void extractBackground(GuiGraphicsExtractor extractor, int mouseX, int mouseY, float delta) {
-        this.extractMenuBackground(extractor);
+        super.extractBackground(extractor, mouseX, mouseY, delta);
+        extractor.fill(0, 0, this.width, this.height, 0xD0000000);
     }
 
     private void applyAndSave() {
