@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "package": "com.cukkoo.soundculling.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8.5",
+  "client": [
+    "SoundEngineMixin",
+    "AbstractSoundInstanceMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
