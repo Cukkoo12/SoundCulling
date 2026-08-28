@@ -25,7 +25,7 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    // mappings satırı YOK — 26.1.x obfuscated değil
+    // mappings satırı YOK — 26.2 obfuscated değil
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
     modCompileOnly "maven.modrinth:modmenu:${project.modmenu_version}"

@@ -10,8 +10,8 @@ Instead of simply muting sounds after too many are playing, **Sound Culling 2.0*
 
 The result is a quieter, cleaner soundscape without making important gameplay sounds disappear.
 
-> **Sound Culling 2.0.0 is currently released for Fabric on Minecraft 26.1.2.**
-> Older folders in this repository contain previous ports and versions and may not include every 2.0 feature.
+> **Sound Culling 2.0.0 is currently available for Fabric on Minecraft 26.1, 26.1.1, 26.1.2, and 26.2.**
+> Minecraft 26.1.x and 26.2 use separate Fabric builds. Older loader/version ports may not yet include every Sound Culling 2.0 feature.
 
 ---
 
@@ -209,9 +209,9 @@ Because the configuration screen does not pause the single-player world, these s
 
 ## 📥 Installation
 
-### Fabric — Minecraft 26.1.2
+### Fabric — Minecraft 26.1.x / 26.2
 
-1. Install the correct **Fabric Loader** for Minecraft 26.1.2.
+1. Install the correct **Fabric Loader** for your Minecraft version.
 2. Install the compatible **Fabric API**.
 3. Place `soundculling-2.0.0.jar` in your `mods` folder.
 4. Launch the game.
@@ -276,7 +276,7 @@ Clone the repository:
 
 ```bash
 git clone https://github.com/Cukkoo12/SoundCulling.git
-cd SoundCulling/fabric-2612
+cd SoundCulling/fabric/2612
 ```
 
 Build the Fabric 26.1.2 project:
@@ -296,7 +296,7 @@ Build the Fabric 26.1.2 project:
 The release JAR will be created under:
 
 ```text
-fabric-2612/build/libs/
+fabric/2612/build/libs/
 ```
 
 ---

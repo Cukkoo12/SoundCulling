@@ -17,16 +17,14 @@ public class SoundCulling implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         config = SoundCullingConfig.load();
-        LOGGER.info("[SoundCulling] Initialized — default limit {}, max {}/region total, window {} ticks, region {} blocks",
-                config.limitDefault, config.maxTotalPerRegion,
-                config.windowTicks, config.regionSize);
+        LOGGER.info(
+                "[SoundCulling] 2.0 engine initialized — preset={}, adaptive={}, region={} blocks",
+                config.preset, config.adaptiveCulling, config.regionSize
+        );
 
-        // Her tick'te tracker'ı güncelle
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            SoundCullingTracker.onTick();
-        });
+        ClientTickEvents.END_CLIENT_TICK.register(client ->
+                SoundCullingTracker.onTick(client.level != null));
 
-        // Oyun içi komutları kaydet
         SoundCullingCommands.register();
     }
 

@@ -24,4 +24,5 @@ Thumbs.db
 CLAUDE.md
 CLAUDE-*.md
 
-fabric-2612/.soundculling-backups/
+# Sound Culling local backups
+.soundculling-backups/
