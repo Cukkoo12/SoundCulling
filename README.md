@@ -339,3 +339,18 @@ Please avoid reporting a random crash as fixed or reproducible unless the crash 
 Sound Culling is licensed under the **MIT License**.
 
 See [LICENSE](LICENSE) for details.
+
+## Sound Culling 2.0 Supported Versions
+
+Sound Culling 2.0 is currently available for **Fabric** on:
+
+- **Minecraft 1.21 – 1.21.5**
+- **Minecraft 1.21.6 – 1.21.10**
+- **Minecraft 1.21.11**
+- **Minecraft 26.1 – 26.1.2**
+- **Minecraft 26.2**
+
+> **Important:** Different Minecraft versions may require different Sound Culling files.  
+> Always download the file that matches your Minecraft version.
+
+Older Sound Culling releases remain available for additional Minecraft versions and loaders.

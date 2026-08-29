@@ -2250,7 +2250,7 @@ public class SoundCullingConfigScreen extends Screen {
         }
 
         @Override
-        protected void renderWidget(
+        protected void renderContents(
                 GuiGraphics graphics,
                 int mouseX,
                 int mouseY,

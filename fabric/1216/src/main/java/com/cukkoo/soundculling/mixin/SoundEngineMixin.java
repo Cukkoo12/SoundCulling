@@ -19,6 +19,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 
 import java.util.Collections;
@@ -73,7 +74,7 @@ public class SoundEngineMixin {
 
 
     @Inject(
-            method = "play",
+            method = "play(Lnet/minecraft/client/resources/sounds/SoundInstance;)Lnet/minecraft/client/sounds/SoundEngine$PlayResult;",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/client/resources/sounds/SoundInstance;resolve(Lnet/minecraft/client/sounds/SoundManager;)Lnet/minecraft/client/sounds/WeighedSoundEvents;",
@@ -83,7 +84,7 @@ public class SoundEngineMixin {
     )
     private void soundculling$onPlay(
             SoundInstance sound,
-            CallbackInfo ci
+            CallbackInfoReturnable<SoundEngine.PlayResult> cir
     ) {
         if (sound instanceof DampenableSoundInstance dampenableSound) {
             /*
@@ -229,7 +230,9 @@ public class SoundEngineMixin {
                  */
                 soundculling$activeLoops.remove(sound);
 
-                ci.cancel();
+                cir.setReturnValue(
+                        SoundEngine.PlayResult.NOT_STARTED
+                );
                 return;
             }
 

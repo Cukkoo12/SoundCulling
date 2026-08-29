@@ -3,7 +3,7 @@ package com.cukkoo.soundculling;
 import com.cukkoo.soundculling.config.SoundCullingConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
 
@@ -123,7 +123,7 @@ public final class SoundCullingTracker {
      * Returns a volume multiplier. 0 = do not start the sound, 1 = normal volume.
      */
     public static float getVolumeMultiplier(
-            ResourceLocation soundId,
+            Identifier soundId,
             SoundSource category,
             double x,
             double y,
@@ -145,7 +145,7 @@ public final class SoundCullingTracker {
      * This path records a real sound event in the spatial/adaptive tracker.
      */
     public static float getVolumeMultiplier(
-            ResourceLocation soundId,
+            Identifier soundId,
             SoundSource category,
             double x,
             double y,
@@ -174,7 +174,7 @@ public final class SoundCullingTracker {
      * - does not inflate Live Sounds counters
      */
     public static float getRuntimeLoopMultiplier(
-            ResourceLocation soundId,
+            Identifier soundId,
             SoundSource category,
             double x,
             double y,
@@ -192,7 +192,7 @@ public final class SoundCullingTracker {
     }
 
     private static float evaluateVolumeMultiplier(
-            ResourceLocation soundId,
+            Identifier soundId,
             SoundSource category,
             double x,
             double y,

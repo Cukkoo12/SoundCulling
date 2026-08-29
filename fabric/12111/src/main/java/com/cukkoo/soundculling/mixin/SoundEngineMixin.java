@@ -11,7 +11,7 @@ import net.minecraft.client.sounds.ChannelAccess;
 import net.minecraft.client.sounds.SoundEngine;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.client.sounds.WeighedSoundEvents;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundSource;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -19,6 +19,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 
 import java.util.Collections;
@@ -73,7 +74,7 @@ public class SoundEngineMixin {
 
 
     @Inject(
-            method = "play",
+            method = "play(Lnet/minecraft/client/resources/sounds/SoundInstance;)Lnet/minecraft/client/sounds/SoundEngine$PlayResult;",
             at = @At(
                     value = "INVOKE",
                     target = "Lnet/minecraft/client/resources/sounds/SoundInstance;resolve(Lnet/minecraft/client/sounds/SoundManager;)Lnet/minecraft/client/sounds/WeighedSoundEvents;",
@@ -83,7 +84,7 @@ public class SoundEngineMixin {
     )
     private void soundculling$onPlay(
             SoundInstance sound,
-            CallbackInfo ci
+            CallbackInfoReturnable<SoundEngine.PlayResult> cir
     ) {
         if (sound instanceof DampenableSoundInstance dampenableSound) {
             /*
@@ -110,8 +111,8 @@ public class SoundEngineMixin {
             return;
         }
 
-        ResourceLocation soundId =
-                sound.getLocation();
+        Identifier soundId =
+                sound.getIdentifier();
 
         SoundSource category =
                 sound.getSource();
@@ -229,7 +230,9 @@ public class SoundEngineMixin {
                  */
                 soundculling$activeLoops.remove(sound);
 
-                ci.cancel();
+                cir.setReturnValue(
+                        SoundEngine.PlayResult.NOT_STARTED
+                );
                 return;
             }
 
@@ -331,8 +334,8 @@ public class SoundEngineMixin {
                     && !sound.isRelative()
                     && sound.getSource() != SoundSource.MUSIC) {
 
-                ResourceLocation soundId =
-                        sound.getLocation();
+                Identifier soundId =
+                        sound.getIdentifier();
 
                 SoundSource category =
                         sound.getSource();

@@ -25,9 +25,9 @@
                    "soundculling.mixins.json"
                ],
     "depends":  {
-                    "fabricloader":  "\u003e=0.16.12",
-                    "fabric-api":  "\u003e=0.102.0",
-                    "minecraft":  "\u003e=1.21 \u003c1.21.6"
+                    "fabricloader":  "\u003e=0.19.4",
+                    "fabric-api":  "\u003e=0.141.6",
+                    "minecraft":  "1.21.11"
                 },
     "suggests":  {
                      "modmenu":  "*"
