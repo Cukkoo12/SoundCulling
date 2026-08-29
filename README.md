@@ -209,7 +209,7 @@ Because the configuration screen does not pause the single-player world, these s
 
 ## 📥 Installation
 
-### Fabric — Minecraft 26.1.x / 26.2
+### Fabric — Minecraft 1.21 - 1.21.11 / 26.1.x / 26.2
 
 1. Install the correct **Fabric Loader** for your Minecraft version.
 2. Install the compatible **Fabric API**.
@@ -217,6 +217,8 @@ Because the configuration screen does not pause the single-player world, these s
 4. Launch the game.
 
 **Optional:** Install **Mod Menu** to access the configuration screen from the Mods menu.
+
+> Download the Sound Culling file tagged for your Minecraft version or supported version range.
 
 > Make sure all installed mods match your Minecraft version. Mixing 26.1.x and 26.2 mod builds can cause binary compatibility errors.
 
