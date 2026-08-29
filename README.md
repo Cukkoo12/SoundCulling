@@ -10,8 +10,20 @@ Instead of simply muting sounds after too many are playing, **Sound Culling 2.0*
 
 The result is a quieter, cleaner soundscape without making important gameplay sounds disappear.
 
-> **Sound Culling 2.0.0 is currently available for Fabric on Minecraft 26.1, 26.1.1, 26.1.2, and 26.2.**
-> Minecraft 26.1.x and 26.2 use separate Fabric builds. Older loader/version ports may not yet include every Sound Culling 2.0 feature.
+## ✅ Sound Culling 2.0 Supported Versions
+
+Sound Culling 2.0 is currently available for **Fabric** on:
+
+- **Minecraft 1.21 – 1.21.5**
+- **Minecraft 1.21.6 – 1.21.10**
+- **Minecraft 1.21.11**
+- **Minecraft 26.1 – 26.1.2**
+- **Minecraft 26.2**
+
+> **Important:** Different Minecraft versions may require different Sound Culling files.  
+> Always download the file that matches your Minecraft version.
+
+Older Sound Culling releases remain available for additional Minecraft versions and loaders.
 
 ---
 
@@ -220,7 +232,7 @@ Because the configuration screen does not pause the single-player world, these s
 
 > Download the Sound Culling file tagged for your Minecraft version or supported version range.
 
-> Make sure all installed mods match your Minecraft version. Mixing 26.1.x and 26.2 mod builds can cause binary compatibility errors.
+> Make sure all installed mods match your Minecraft version. Different Minecraft version groups may require separate Sound Culling builds.
 
 ---
 
@@ -341,18 +353,3 @@ Please avoid reporting a random crash as fixed or reproducible unless the crash 
 Sound Culling is licensed under the **MIT License**.
 
 See [LICENSE](LICENSE) for details.
-
-## Sound Culling 2.0 Supported Versions
-
-Sound Culling 2.0 is currently available for **Fabric** on:
-
-- **Minecraft 1.21 – 1.21.5**
-- **Minecraft 1.21.6 – 1.21.10**
-- **Minecraft 1.21.11**
-- **Minecraft 26.1 – 26.1.2**
-- **Minecraft 26.2**
-
-> **Important:** Different Minecraft versions may require different Sound Culling files.  
-> Always download the file that matches your Minecraft version.
-
-Older Sound Culling releases remain available for additional Minecraft versions and loaders.
