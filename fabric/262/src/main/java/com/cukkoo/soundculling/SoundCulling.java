@@ -1,0 +1,42 @@
+package com.cukkoo.soundculling;
+
+import com.cukkoo.soundculling.command.SoundCullingCommands;
+import com.cukkoo.soundculling.config.SoundCullingConfig;
+
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class SoundCulling implements ClientModInitializer {
+    public static final String MOD_ID = "soundculling";
+    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
+    private static volatile SoundCullingConfig config;
+
+    @Override
+    public void onInitializeClient() {
+        config = SoundCullingConfig.load();
+        LOGGER.info(
+                "[SoundCulling] 2.0 engine initialized — preset={}, adaptive={}, region={} blocks",
+                config.preset,
+                config.adaptiveCulling,
+                config.regionSize);
+
+        ClientTickEvents.END_CLIENT_TICK.register(
+                client -> SoundCullingTracker.onTick(client.level != null));
+
+        SoundCullingCommands.register();
+    }
+
+    public static SoundCullingConfig getConfig() {
+        return config;
+    }
+
+    public static void setConfig(SoundCullingConfig updated) {
+        SoundCullingConfig snapshot = updated.copy();
+        snapshot.save();
+        config = snapshot;
+    }
+}

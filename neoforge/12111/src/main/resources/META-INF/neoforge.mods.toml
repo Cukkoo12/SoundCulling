@@ -1,0 +1,22 @@
+modLoader="javafml"
+loaderVersion="[2,)"
+license="MIT"
+
+[[mods]]
+modId="soundculling"
+version="${version}"
+displayName="Dynamic Sound Culling"
+displayURL="https://github.com/Cukkoo12/SoundCulling"
+logoFile="assets/soundculling/icon.png"
+authors="Cukkoo"
+description='Enhances Minecraft with dynamic sound volume dampening, look direction-based culling, and per-category limits.'
+
+[[mixins]]
+config="soundculling.mixins.json"
+
+[[dependencies.soundculling]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.21.11,1.22)"
+ordering="NONE"
+side="CLIENT"
