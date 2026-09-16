@@ -124,7 +124,7 @@ more aggressive or always cull it. **Protect Mod** adds a `NEVER_CULL` rule for
 the sound's namespace. **Clear Rule** removes the exact rule first; if none
 exists, it tries the namespace rule.
 
-In the current Fabric 26.2 source, visible rows keep their order while their
+In the current Fabric 26.3 source, visible rows keep their order while their
 counters update. Use **Refresh** to load the latest sound list. Rule edits take
 effect when settings are saved.
 
@@ -192,16 +192,17 @@ currently compile against the following Minecraft versions:
 | [`fabric/12111`](fabric/12111) | 1.21.11 | 21 |
 | [`fabric/2612`](fabric/2612) | 26.1.2 | 25 |
 | [`fabric/262`](fabric/262) | 26.2 | 25 |
+| [`fabric/263`](fabric/263) | 26.3 | 25 |
 
 A release may advertise a wider compatible version range than its build target.
 Use the file's download listing when choosing a release. Changes in one source
 directory are not automatically shared with the others.
 
-For Fabric 26.2, install JDK 25 and use the included Gradle wrapper:
+For Fabric 26.3, install JDK 25 and use the included Gradle wrapper:
 
 ```sh
 git clone https://github.com/Cukkoo12/SoundCulling.git
-cd SoundCulling/fabric/262
+cd SoundCulling/fabric/263
 ```
 
 On Windows:
@@ -220,7 +221,7 @@ The first build needs internet access to download Gradle and dependencies.
 Output is written to that project's `build/libs/` directory. Install the mod
 JAR, not the `-sources.jar` file.
 
-The current Fabric 26.2 source includes shared-state synchronization, isolated
+The current Fabric 26.3 source includes shared-state synchronization, isolated
 settings updates and fixes for recent-sound selection and expired event storage.
 These changes are specific to that directory and may not be in a published file.
 
