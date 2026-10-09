@@ -83,9 +83,10 @@ Additional screenshots: [Performance](docs/images/performance.png) and
 
 | Preset | Use |
 | --- | --- |
-| Balanced | A starting point for ordinary play. |
-| Performance | Lower limits and earlier adaptive pressure for busy areas. |
-| Aggressive | Tighter limits for sustained sound spam. |
+| Vanilla+ (`subtle`) | Preserves natural game audio; only intervenes during severe sound spam or lag farms. |
+| Balanced (`balanced`) | The recommended starting point; smoothly dampens busy areas while keeping the world lively. |
+| Quiet Base (`farming`) | Tighter limits on animals and machinery for noisy bases, while keeping combat sounds intact. |
+| Performance (`performance`) | Lower limits and early adaptive pressure for low-end PCs and heavy modpacks. |
 | Custom | Shown after individual settings are changed. |
 
 Presets change category limits, the regional limit and adaptive thresholds.
@@ -173,7 +174,7 @@ Setting commands apply and save immediately.
 | --- | --- |
 | `/soundculling` | Show status, preset, event rate, pressure and session counts. |
 | `/soundculling toggle` | Enable or disable the mod. |
-| `/soundculling preset balanced` | Apply Balanced. Also accepts `performance` and `aggressive`. |
+| `/soundculling preset balanced` | Apply Balanced. Also accepts `subtle` (Vanilla+), `farming` (Quiet Base), and `performance`. |
 | `/soundculling limit <1–50>` | Change the default category limit and select Custom. |
 | `/soundculling total <1–100>` | Change the regional limit and select Custom. |
 | `/soundculling reset` | Clear session counters and the recent-sound history. |

@@ -46,7 +46,6 @@ public final class SoundRuleEngine {
         };
     }
 
-    // Match '*' in sound IDs without regex.
     public static boolean matches(String pattern, String value) {
         if (pattern == null || value == null) {
             return false;

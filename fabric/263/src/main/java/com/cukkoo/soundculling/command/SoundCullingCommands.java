@@ -29,9 +29,10 @@ public class SoundCullingCommands {
                                                             "name", StringArgumentType.word())
                                                     .suggests(
                                                             (ctx, builder) -> {
+                                                                builder.suggest("subtle");
                                                                 builder.suggest("balanced");
+                                                                builder.suggest("farming");
                                                                 builder.suggest("performance");
-                                                                builder.suggest("aggressive");
                                                                 return builder.buildFuture();
                                                             })
                                                     .executes(SoundCullingCommands::preset)));

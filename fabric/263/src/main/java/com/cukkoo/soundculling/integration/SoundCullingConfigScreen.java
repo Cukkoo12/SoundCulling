@@ -236,8 +236,7 @@ public class SoundCullingConfigScreen extends Screen {
                         .bounds(x, y + 28, width, 20)
                         .tooltip(
                                 Tooltip.create(
-                                        Component.literal(
-                                                tr("soundculling.ui.tooltip.preset_cycle"))))
+                                        Component.literal(presetTooltip())))
                         .build());
 
         addRenderableWidget(
@@ -683,55 +682,83 @@ public class SoundCullingConfigScreen extends Screen {
                         : tr("soundculling.ui.status.no_rule", pattern);
     }
 
+    private String presetTooltip() {
+        String normalized =
+                preset == null || preset.isBlank() ? "BALANCED" : preset.toUpperCase(Locale.ROOT);
+        String descKey =
+                switch (normalized) {
+                    case "SUBTLE" -> "soundculling.ui.preset.subtle.desc";
+                    case "FARMING" -> "soundculling.ui.preset.farming.desc";
+                    case "PERFORMANCE" -> "soundculling.ui.preset.performance.desc";
+                    case "CUSTOM" -> "soundculling.ui.preset.custom.desc";
+                    default -> "soundculling.ui.preset.balanced.desc";
+                };
+        return tr(descKey) + "\n\n§8" + tr("soundculling.ui.tooltip.preset_cycle");
+    }
+
     private void cyclePreset() {
         String next =
                 switch (preset == null ? "BALANCED" : preset) {
-                    case "BALANCED" -> "PERFORMANCE";
-                    case "PERFORMANCE" -> "AGGRESSIVE";
-                    default -> "BALANCED";
+                    case "SUBTLE" -> "BALANCED";
+                    case "BALANCED" -> "FARMING";
+                    case "FARMING" -> "PERFORMANCE";
+                    default -> "SUBTLE";
                 };
         applyLocalPreset(next);
     }
 
     private void applyLocalPreset(String value) {
         switch (value) {
-            case "PERFORMANCE" -> {
-                preset = "PERFORMANCE";
-                maxTotal = 6;
-                limitHostile = 3;
-                limitNeutral = 2;
-                limitBlock = 4;
-                limitAmbient = 3;
-                limitDefault = 3;
-                adaptiveStart = 30;
-                adaptiveFull = 120;
-                adaptiveStrength = 0.95;
+            case "SUBTLE" -> {
+                preset = "SUBTLE";
+                maxTotal = 16;
+                limitHostile = 8;
+                limitNeutral = 8;
+                limitBlock = 12;
+                limitAmbient = 8;
+                limitDefault = 8;
+                adaptiveStart = 80;
+                adaptiveFull = 250;
+                adaptiveStrength = 0.65;
                 adaptiveCulling = true;
             }
-            case "AGGRESSIVE" -> {
-                preset = "AGGRESSIVE";
-                maxTotal = 4;
-                limitHostile = 2;
+            case "FARMING" -> {
+                preset = "FARMING";
+                maxTotal = 8;
+                limitHostile = 6;
+                limitNeutral = 2;
+                limitBlock = 3;
+                limitAmbient = 4;
+                limitDefault = 4;
+                adaptiveStart = 40;
+                adaptiveFull = 140;
+                adaptiveStrength = 0.90;
+                adaptiveCulling = true;
+            }
+            case "PERFORMANCE" -> {
+                preset = "PERFORMANCE";
+                maxTotal = 5;
+                limitHostile = 3;
                 limitNeutral = 2;
                 limitBlock = 3;
                 limitAmbient = 2;
                 limitDefault = 2;
-                adaptiveStart = 20;
-                adaptiveFull = 80;
+                adaptiveStart = 25;
+                adaptiveFull = 90;
                 adaptiveStrength = 1.0;
                 adaptiveCulling = true;
             }
             default -> {
                 preset = "BALANCED";
-                maxTotal = 8;
-                limitHostile = 4;
-                limitNeutral = 3;
-                limitBlock = 6;
-                limitAmbient = 4;
-                limitDefault = 4;
-                adaptiveStart = 40;
-                adaptiveFull = 160;
-                adaptiveStrength = 0.85;
+                maxTotal = 10;
+                limitHostile = 5;
+                limitNeutral = 5;
+                limitBlock = 7;
+                limitAmbient = 5;
+                limitDefault = 5;
+                adaptiveStart = 50;
+                adaptiveFull = 180;
+                adaptiveStrength = 0.80;
                 adaptiveCulling = true;
             }
         }
@@ -746,9 +773,11 @@ public class SoundCullingConfigScreen extends Screen {
                 preset == null || preset.isBlank() ? "BALANCED" : preset.toUpperCase(Locale.ROOT);
 
         return switch (normalized) {
-            case "PERFORMANCE" -> tr("soundculling.ui.preset.performance");
+            case "SUBTLE" -> tr("soundculling.ui.preset.subtle");
 
-            case "AGGRESSIVE" -> tr("soundculling.ui.preset.aggressive");
+            case "FARMING" -> tr("soundculling.ui.preset.farming");
+
+            case "PERFORMANCE" -> tr("soundculling.ui.preset.performance");
 
             case "CUSTOM" -> tr("soundculling.ui.preset.custom");
 

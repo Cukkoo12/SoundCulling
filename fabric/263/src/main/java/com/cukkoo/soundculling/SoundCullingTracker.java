@@ -104,7 +104,6 @@ public final class SoundCullingTracker {
         return evaluateVolumeMultiplier(soundId, category, x, y, z, looping, true);
     }
 
-    // Recheck loops without counting a new sound.
     public static synchronized float getRuntimeLoopMultiplier(
             Identifier soundId, SoundSource category, double x, double y, double z) {
         return evaluateVolumeMultiplier(soundId, category, x, y, z, true, false);
@@ -149,7 +148,6 @@ public final class SoundCullingTracker {
 
         long sourceKey = packCell((int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z));
 
-        // Cap one source's share of the region limit.
         int sourceContributionCap = Math.max(2, Math.round(config.windowTicks / 10.0f));
 
         if (recordEvent) {
@@ -224,14 +222,22 @@ public final class SoundCullingTracker {
 
         int effectiveSourceLimit = Math.max(2, Math.round(effectiveRegionLimit * 0.55f));
 
+        boolean isSubtle = "SUBTLE".equalsIgnoreCase(config.preset);
         int sourceAdmissionLimit;
 
         if (adaptivePressure >= 0.85f) {
-            sourceAdmissionLimit = Math.max(3, Math.min(6, effectiveSourceLimit));
+            sourceAdmissionLimit =
+                    Math.max(isSubtle ? 6 : 3, Math.min(isSubtle ? 12 : 6, effectiveSourceLimit));
         } else if (adaptivePressure >= 0.50f) {
-            sourceAdmissionLimit = Math.max(6, Math.min(10, effectiveSourceLimit * 2));
+            sourceAdmissionLimit =
+                    Math.max(
+                            isSubtle ? 12 : 6,
+                            Math.min(isSubtle ? 20 : 10, effectiveSourceLimit * 2));
         } else {
-            sourceAdmissionLimit = Math.max(10, Math.min(16, effectiveSourceLimit * 4));
+            sourceAdmissionLimit =
+                    Math.max(
+                            isSubtle ? 18 : 10,
+                            Math.min(isSubtle ? 28 : 16, effectiveSourceLimit * 4));
         }
 
         boolean repeatedPersistentBurst = looping && nearby.sameSoundCount > sourceAdmissionLimit;
@@ -267,7 +273,7 @@ public final class SoundCullingTracker {
         if (loadRatio <= 1.0f) {
             multiplier = 1.0f;
         } else {
-            float hardThreshold = 2.0f;
+            float hardThreshold = isSubtle ? 2.5f : 2.1f;
 
             if (priority > 1.0f) {
                 hardThreshold += (priority - 1.0f) * 0.95f;
@@ -275,14 +281,18 @@ public final class SoundCullingTracker {
                 hardThreshold -= (1.0f - priority) * 0.35f;
             }
 
-            hardThreshold = clamp(hardThreshold, 1.45f, 3.6f);
+            hardThreshold = clamp(hardThreshold, isSubtle ? 1.8f : 1.5f, 3.8f);
 
             if (loadRatio >= hardThreshold) {
-                multiplier = novelSound ? 0.30f : 0.0f;
+                if (isSubtle && loadRatio < hardThreshold * 1.5f) {
+                    multiplier = novelSound ? 0.30f : 0.15f;
+                } else {
+                    multiplier = novelSound ? 0.30f : 0.0f;
+                }
             } else {
                 float severity = (loadRatio - 1.0f) / (hardThreshold - 1.0f);
 
-                multiplier = lerp(0.68f, 0.08f, severity);
+                multiplier = lerp(0.68f, isSubtle ? 0.15f : 0.08f, severity);
 
                 if (config.directionalPriority && relation.behind) {
                     multiplier *= 0.62f;
@@ -298,7 +308,7 @@ public final class SoundCullingTracker {
 
                 multiplier = clamp(multiplier, 0.04f, 1.0f);
 
-                if (multiplier <= 0.045f) {
+                if (!isSubtle && multiplier <= 0.045f) {
                     multiplier = 0.0f;
                 }
 

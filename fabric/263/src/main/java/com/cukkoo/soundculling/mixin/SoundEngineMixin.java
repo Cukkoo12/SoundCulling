@@ -116,7 +116,6 @@ public class SoundEngineMixin {
         }
 
         try {
-            // Tickable sounds can keep playing without isLooping().
             boolean persistentSound = sound.isLooping() || sound instanceof TickableSoundInstance;
 
             float multiplier =

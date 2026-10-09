@@ -27,19 +27,19 @@ public class SoundCullingConfig {
 
     public String preset = "BALANCED";
 
-    public int maxTotalPerRegion = 6;
+    public int maxTotalPerRegion = 10;
     public int windowTicks = 20;
     public double regionSize = 16.0;
-    public int limitHostile = 3;
-    public int limitNeutral = 2;
-    public int limitBlock = 5;
-    public int limitAmbient = 4;
-    public int limitDefault = 3;
+    public int limitHostile = 5;
+    public int limitNeutral = 5;
+    public int limitBlock = 7;
+    public int limitAmbient = 5;
+    public int limitDefault = 5;
 
     public boolean adaptiveCulling = true;
-    public int adaptiveStartPerSecond = 40;
-    public int adaptiveFullPerSecond = 160;
-    public double adaptiveStrength = 0.85;
+    public int adaptiveStartPerSecond = 50;
+    public int adaptiveFullPerSecond = 180;
+    public double adaptiveStrength = 0.80;
     public boolean directionalPriority = true;
     public boolean distancePriority = true;
     public boolean protectPlayerSounds = true;
@@ -89,7 +89,6 @@ public class SoundCullingConfig {
         return defaults;
     }
 
-    // Keep old settings when loading a newer config.
     public static SoundCullingConfig load() {
         try {
             if (Files.exists(CONFIG_PATH)) {
@@ -204,9 +203,20 @@ public class SoundCullingConfig {
             sanitized = true;
         } else {
             String normalized = preset.toUpperCase(Locale.ROOT);
-            if (!normalized.equals("BALANCED")
+            if (normalized.equals("AGGRESSIVE")) {
+                normalized = "PERFORMANCE";
+                sanitized = true;
+            } else if (normalized.equals("VANILLA")) {
+                normalized = "SUBTLE";
+                sanitized = true;
+            } else if (normalized.equals("FARM")) {
+                normalized = "FARMING";
+                sanitized = true;
+            }
+            if (!normalized.equals("SUBTLE")
+                    && !normalized.equals("BALANCED")
+                    && !normalized.equals("FARMING")
                     && !normalized.equals("PERFORMANCE")
-                    && !normalized.equals("AGGRESSIVE")
                     && !normalized.equals("CUSTOM")) {
                 normalized = "CUSTOM";
                 sanitized = true;
@@ -250,41 +260,53 @@ public class SoundCullingConfig {
         String value =
                 requestedPreset == null ? "BALANCED" : requestedPreset.toUpperCase(Locale.ROOT);
         switch (value) {
-            case "PERFORMANCE" -> {
-                preset = "PERFORMANCE";
-                maxTotalPerRegion = 6;
-                limitHostile = 3;
-                limitNeutral = 2;
-                limitBlock = 4;
-                limitAmbient = 3;
-                limitDefault = 3;
-                adaptiveStartPerSecond = 30;
-                adaptiveFullPerSecond = 120;
-                adaptiveStrength = 0.95;
+            case "SUBTLE", "VANILLA" -> {
+                preset = "SUBTLE";
+                maxTotalPerRegion = 16;
+                limitHostile = 8;
+                limitNeutral = 8;
+                limitBlock = 12;
+                limitAmbient = 8;
+                limitDefault = 8;
+                adaptiveStartPerSecond = 80;
+                adaptiveFullPerSecond = 250;
+                adaptiveStrength = 0.65;
             }
-            case "AGGRESSIVE" -> {
-                preset = "AGGRESSIVE";
-                maxTotalPerRegion = 4;
-                limitHostile = 2;
+            case "FARMING", "FARM", "QUIET_BASE" -> {
+                preset = "FARMING";
+                maxTotalPerRegion = 8;
+                limitHostile = 6;
+                limitNeutral = 2;
+                limitBlock = 3;
+                limitAmbient = 4;
+                limitDefault = 4;
+                adaptiveStartPerSecond = 40;
+                adaptiveFullPerSecond = 140;
+                adaptiveStrength = 0.90;
+            }
+            case "PERFORMANCE", "AGGRESSIVE" -> {
+                preset = "PERFORMANCE";
+                maxTotalPerRegion = 5;
+                limitHostile = 3;
                 limitNeutral = 2;
                 limitBlock = 3;
                 limitAmbient = 2;
                 limitDefault = 2;
-                adaptiveStartPerSecond = 20;
-                adaptiveFullPerSecond = 80;
+                adaptiveStartPerSecond = 25;
+                adaptiveFullPerSecond = 90;
                 adaptiveStrength = 1.0;
             }
             default -> {
                 preset = "BALANCED";
-                maxTotalPerRegion = 8;
-                limitHostile = 4;
-                limitNeutral = 3;
-                limitBlock = 6;
-                limitAmbient = 4;
-                limitDefault = 4;
-                adaptiveStartPerSecond = 40;
-                adaptiveFullPerSecond = 160;
-                adaptiveStrength = 0.85;
+                maxTotalPerRegion = 10;
+                limitHostile = 5;
+                limitNeutral = 5;
+                limitBlock = 7;
+                limitAmbient = 5;
+                limitDefault = 5;
+                adaptiveStartPerSecond = 50;
+                adaptiveFullPerSecond = 180;
+                adaptiveStrength = 0.80;
             }
         }
     }
