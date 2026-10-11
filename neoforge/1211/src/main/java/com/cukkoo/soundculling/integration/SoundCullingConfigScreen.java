@@ -2,6 +2,7 @@ package com.cukkoo.soundculling.integration;
 
 import com.cukkoo.soundculling.SoundCulling;
 import com.cukkoo.soundculling.SoundCullingTracker;
+import com.cukkoo.soundculling.SoundRuleEngine;
 import com.cukkoo.soundculling.config.SoundCullingConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -10,15 +11,52 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
 public class SoundCullingConfigScreen extends Screen {
+
+    private static String tr(String key, Object... args) {
+        return Component.translatable(key, args).getString();
+    }
+
+    private static String actionLabel(String action) {
+        String normalized =
+                SoundCullingConfig.normalizeAction(action);
+
+        return tr(
+                "soundculling.ui.action."
+                        + normalized.toLowerCase(Locale.ROOT)
+        );
+    }
+
+    private enum Page {
+        OVERVIEW,
+        PERFORMANCE,
+        LIVE,
+        ADVANCED
+    }
 
     private final Screen parent;
     private final SoundCullingConfig config;
 
+    private Page page = Page.OVERVIEW;
+
+    private boolean enabled;
+    private String preset;
+    private boolean adaptiveCulling;
+    private int adaptiveStart;
+    private int adaptiveFull;
+    private double adaptiveStrength;
     private int maxTotal;
     private int windowTicks;
     private int regionSize;
+    private int neighborRadius;
     private boolean debugLogging;
+    private boolean directionalPriority;
+    private boolean distancePriority;
+    private boolean protectPlayerSounds;
 
     private int limitHostile;
     private int limitNeutral;
@@ -26,26 +64,42 @@ public class SoundCullingConfigScreen extends Screen {
     private int limitAmbient;
     private int limitDefault;
 
-    private static final int COL_W = 170;
-    private static final int COL_GAP = 20;
+    private final List<SoundCullingConfig.SoundRule> rules = new ArrayList<>();
+    private String selectedSoundId;
+    private String ruleStatus = "";
 
     public SoundCullingConfigScreen(Screen parent) {
-        super(Component.literal("Dynamic Sound Culling"));
+        super(Component.literal(tr("soundculling.ui.title")));
         this.parent = parent;
         this.config = SoundCulling.getConfig();
-        loadFromConfig();
+
+        enabled = config.enabled;
+        preset = config.preset;
+        adaptiveCulling = config.adaptiveCulling;
+        adaptiveStart = config.adaptiveStartPerSecond;
+        adaptiveFull = config.adaptiveFullPerSecond;
+        adaptiveStrength = config.adaptiveStrength;
+        maxTotal = config.maxTotalPerRegion;
+        windowTicks = config.windowTicks;
+        regionSize = (int) config.regionSize;
+        neighborRadius = config.spatialNeighborRadius;
+        debugLogging = config.debugLogging;
+        directionalPriority = config.directionalPriority;
+        distancePriority = config.distancePriority;
+        protectPlayerSounds = config.protectPlayerSounds;
+
+        limitHostile = config.limitHostile;
+        limitNeutral = config.limitNeutral;
+        limitBlock = config.limitBlock;
+        limitAmbient = config.limitAmbient;
+        limitDefault = config.limitDefault;
+
+        rules.addAll(config.copyRules());
     }
 
-    private void loadFromConfig() {
-        this.maxTotal = config.maxTotalPerRegion;
-        this.windowTicks = config.windowTicks;
-        this.regionSize = (int) config.regionSize;
-        this.debugLogging = config.debugLogging;
-        this.limitHostile = config.limitHostile;
-        this.limitNeutral = config.limitNeutral;
-        this.limitBlock = config.limitBlock;
-        this.limitAmbient = config.limitAmbient;
-        this.limitDefault = config.limitDefault;
+    @Override
+    public boolean isPauseScreen() {
+        return false;
     }
 
     @Override
@@ -54,180 +108,2140 @@ public class SoundCullingConfigScreen extends Screen {
     }
 
     private void refreshUI() {
-        this.clearWidgets();
+        clearWidgets();
+        Layout layout = layout();
 
-        int cx = this.width / 2;
-        int leftX = cx - COL_W - COL_GAP / 2;
-        int rightX = cx + COL_GAP / 2;
-        int topY = 50;
-        int rowH = 22;
+        int tabGap = 4;
+        int tabX = layout.panelX + 14;
+        int tabY = layout.panelY + 36;
+        int tabWidth = (layout.panelWidth - 28 - tabGap * 3) / 4;
 
-        addRow(leftX, topY,
-                "Max Sounds/Region", "§6", maxTotal, 1, 100, 1,
-                v -> maxTotal = v,
-                "Maximum identical sounds allowed per region");
-        addRow(leftX, topY + rowH,
-                "Time Window", "§b", windowTicks, 5, 200, 5,
-                v -> windowTicks = v,
-                "Time window in ticks (20 ticks = 1 sec)");
-        addRow(leftX, topY + rowH * 2,
-                "Region Size", "§5", regionSize, 2, 64, 2,
-                v -> regionSize = v,
-                "Region size in blocks (16 = 1 chunk)");
+        addTab(tabX, tabY, tabWidth, tr("soundculling.ui.tab.overview"), Page.OVERVIEW);
+        addTab(tabX + tabWidth + tabGap, tabY, tabWidth, tr("soundculling.ui.tab.performance"), Page.PERFORMANCE);
+        addTab(tabX + (tabWidth + tabGap) * 2, tabY, tabWidth, tr("soundculling.ui.tab.live"), Page.LIVE);
+        addTab(tabX + (tabWidth + tabGap) * 3, tabY, tabWidth, tr("soundculling.ui.tab.advanced"), Page.ADVANCED);
 
-        this.addRenderableWidget(
-                Button.builder(Component.literal(debugLogging ? "§aON" : "§7OFF"), btn -> {
-                    debugLogging = !debugLogging;
-                    refreshUI();
-                }).bounds(leftX + 118, topY + rowH * 3, 48, 16)
-                        .tooltip(Tooltip.create(Component.literal("Enable debug logging")))
+        switch (page) {
+            case OVERVIEW -> buildOverview(layout);
+            case PERFORMANCE -> buildPerformance(layout);
+            case LIVE -> buildLive(layout);
+            case ADVANCED -> buildAdvanced(layout);
+        }
+
+        int bottomY = layout.panelY + layout.panelHeight - 25;
+
+        int saveWidth = 104;
+        int cancelWidth = 72;
+        int right = layout.panelX + layout.panelWidth - 14;
+
+        addRenderableWidget(
+                ModernButton.create(Component.literal(tr("soundculling.ui.button.save_close")), button -> {
+                    applyAndSave();
+                    onClose();
+                }).bounds(
+                        right - saveWidth,
+                        bottomY,
+                        saveWidth,
+                        18
+                ).build()
+        );
+
+        addRenderableWidget(
+                ModernButton.create(Component.literal(tr("soundculling.ui.button.cancel")), button -> onClose())
+                        .bounds(
+                                right - saveWidth - 6 - cancelWidth,
+                                bottomY,
+                                cancelWidth,
+                                18
+                        )
                         .build()
         );
 
-        addRow(rightX, topY,
-                "Hostile Mobs", "§c", limitHostile, 1, 50, 1,
-                v -> limitHostile = v,
-                "Zombies, Creepers, Skeletons etc.");
-        addRow(rightX, topY + rowH,
-                "Neutral Mobs", "§a", limitNeutral, 1, 50, 1,
-                v -> limitNeutral = v,
-                "Cows, Sheep, Pigs etc.");
-        addRow(rightX, topY + rowH * 2,
-                "Blocks", "§6", limitBlock, 1, 50, 1,
-                v -> limitBlock = v,
-                "Pistons, Spawners, Dispensers etc.");
-        addRow(rightX, topY + rowH * 3,
-                "Ambient", "§9", limitAmbient, 1, 50, 1,
-                v -> limitAmbient = v,
-                "Cave sounds, weather etc.");
-        addRow(rightX, topY + rowH * 4,
-                "Default", "§d", limitDefault, 1, 50, 1,
-                v -> limitDefault = v,
-                "All other sound categories");
+    }
+    private void addTab(int x, int y, int width, String label, Page target) {
+        String text = page == target ? label : label;
+        addRenderableWidget(ModernButton.create(Component.literal(text), button -> {
+            page = target;
+            ruleStatus = "";
+            refreshUI();
+        }).bounds(x, y, width, 18).build());
+    }
 
-        int btnY = this.height - 26;
-        this.addRenderableWidget(
-                Button.builder(Component.literal("§a✔ Save & Close"), btn -> {
-                    saveToConfig();
-                    this.onClose();
-                }).bounds(cx - 118, btnY, 110, 18).build()
+    private void buildOverview(Layout layout) {
+        int x = layout.panelX + 24;
+        int y = layout.panelY + 78;
+        int width = 142;
+
+        addRenderableWidget(
+                ModernButton.create(
+                        Component.literal(enabled ? tr("soundculling.ui.sound_culling.on") : tr("soundculling.ui.sound_culling.off")),
+                        button -> {
+                            enabled = !enabled;
+                            refreshUI();
+                        }
+                ).bounds(x, y, width, 20).build()
         );
-        this.addRenderableWidget(
-                Button.builder(Component.literal("§c✖ Cancel"), btn -> this.onClose())
-                        .bounds(cx + 8, btnY, 110, 18).build()
-        );
-        this.addRenderableWidget(
-                Button.builder(Component.literal("§7↺"), btn -> {
-                    maxTotal = 6; windowTicks = 20; regionSize = 16;
-                    debugLogging = false;
-                    limitHostile = 3; limitNeutral = 2; limitBlock = 5;
-                    limitAmbient = 4; limitDefault = 3;
-                    refreshUI();
-                }).bounds(cx + 124, btnY, 22, 18)
-                        .tooltip(Tooltip.create(Component.literal("Reset to defaults")))
+
+        addRenderableWidget(
+                ModernButton.create(
+                        Component.literal(tr("soundculling.ui.preset", prettyPreset())),
+                        button -> {
+                            cyclePreset();
+                            refreshUI();
+                        }
+                ).bounds(x, y + 28, width, 20)
+                        .tooltip(Tooltip.create(
+                                Component.literal(presetTooltip())
+                        ))
                         .build()
+        );
+
+        addRenderableWidget(
+                ModernButton.create(
+                        Component.literal(adaptiveCulling
+                                ? tr("soundculling.ui.adaptive_engine.on")
+                                : tr("soundculling.ui.adaptive_engine.off")),
+                        button -> {
+                            adaptiveCulling = !adaptiveCulling;
+                            markCustom();
+                            refreshUI();
+                        }
+                ).bounds(x, y + 56, width, 20).build()
+        );
+
+        addRenderableWidget(
+                ModernButton.create(
+                        Component.literal(tr("soundculling.ui.button.reset_stats")),
+                        button -> {
+                            SoundCullingTracker.resetStats();
+                            refreshUI();
+                        }
+                ).bounds(x, y + 84, width, 20).build()
         );
     }
 
-    private void addRow(int x, int y, String label, String colorCode, int value,
-                        int min, int max, int step,
-                        java.util.function.IntConsumer setter, String tooltip) {
-        Component minus = Component.literal("§f-");
-        Component plus = Component.literal("§f+");
-        Component val = Component.literal(colorCode + String.valueOf(value));
+    private void buildPerformance(Layout layout) {
+        int left = layout.panelX + 14 + (layout.panelWidth / 2 - 188) / 2;
+        int right = layout.panelX + layout.panelWidth / 2 + 4 + (layout.panelWidth / 2 - 188) / 2;
+        int y = layout.panelY + 82;
+        int row = 24;
 
-        this.addRenderableWidget(
-                Button.builder(minus, btn -> {
-                    int nv = Math.max(min, value - step);
-                    setter.accept(nv);
-                    refreshUI();
-                }).bounds(x + 108, y, 16, 16).build()
+        addNumRow(left, y, adaptiveStart, 10, 500,
+                value -> adaptiveStart = value,
+                tr("soundculling.ui.label.adaptive_start"), tr("soundculling.ui.tooltip.adaptive_start"));
+
+        addNumRow(left, y + row, adaptiveFull, adaptiveStart + 10, 1000,
+                value -> adaptiveFull = value,
+                tr("soundculling.ui.label.adaptive_full"), tr("soundculling.ui.tooltip.adaptive_full"));
+
+        addNumRow(left, y + row * 2, limitDefault, 1, 50,
+                value -> limitDefault = value,
+                tr("soundculling.ui.label.default"), tr("soundculling.ui.tooltip.default"));
+
+        addNumRow(left, y + row * 3, limitBlock, 1, 50,
+                value -> limitBlock = value,
+                tr("soundculling.ui.label.blocks"), tr("soundculling.ui.tooltip.blocks"));
+
+        addNumRow(right, y, limitHostile, 1, 50,
+                value -> limitHostile = value,
+                tr("soundculling.ui.label.hostile"), tr("soundculling.ui.tooltip.hostile"));
+
+        addNumRow(right, y + row, limitNeutral, 1, 50,
+                value -> limitNeutral = value,
+                tr("soundculling.ui.label.neutral"), tr("soundculling.ui.tooltip.neutral"));
+
+        addNumRow(right, y + row * 2, limitAmbient, 1, 50,
+                value -> limitAmbient = value,
+                tr("soundculling.ui.label.ambient"), tr("soundculling.ui.tooltip.ambient"));
+
+        addRenderableWidget(
+                ModernButton.create(
+                        Component.literal(
+                                protectPlayerSounds
+                                        ? tr("soundculling.ui.player_protection.on")
+                                        : tr("soundculling.ui.player_protection.off")
+                        ),
+                        button -> {
+                            protectPlayerSounds = !protectPlayerSounds;
+                            markCustom();
+                            refreshUI();
+                        }
+                ).bounds(right, y + row * 3, 170, 18).build()
         );
-        this.addRenderableWidget(
-                Button.builder(plus, btn -> {
-                    int nv = Math.min(max, value + step);
-                    setter.accept(nv);
-                    refreshUI();
-                }).bounds(x + 148, y, 16, 16)
-                        .tooltip(Tooltip.create(Component.literal(tooltip)))
-                        .build()
+    }
+
+    private void buildLive(Layout layout) {
+        int top = layout.panelY + 82;
+
+        int contentLeft = layout.panelX + 14;
+        int contentRight = layout.panelX + layout.panelWidth - 14;
+
+        int actionCardWidth = 188;
+        int actionCardX = contentRight - actionCardWidth;
+        int innerPad = 8;
+
+        int left = contentLeft + innerPad;
+        int leftCardRight = actionCardX - 7;
+
+        int actionWidth = 82;
+        int actionGap = 8;
+        int actionAreaWidth = actionWidth * 2 + actionGap;
+        int actionX = actionCardX + (actionCardWidth - actionAreaWidth) / 2;
+
+        int listWidth = Math.max(
+                150,
+                leftCardRight - left - innerPad
+        );
+
+        int maxRecent = layout.panelHeight >= 270 ? 6 : 5;
+
+        List<SoundCullingTracker.RecentSoundSnapshot> recent =
+                SoundCullingTracker.getRecentSounds(maxRecent);
+
+        int y = top;
+
+        for (SoundCullingTracker.RecentSoundSnapshot sound : recent) {
+            String label =
+                    trim(sound.soundId(), 24)
+                            + "  x" + sound.triggered()
+                            + "  c" + sound.culled();
+
+            addRenderableWidget(
+                    ModernButton.create(
+                            Component.literal(label),
+                            button -> {
+                                selectedSoundId = sound.soundId();
+                                ruleStatus = "";
+                                refreshUI();
+                            }
+                    ).bounds(left, y, listWidth, 18)
+                            .tooltip(Tooltip.create(
+                                    Component.literal(sound.soundId())
+                            ))
+                            .build()
+            );
+
+            y += 21;
+        }
+
+        boolean hasSelection =
+                selectedSoundId != null && !selectedSoundId.isBlank();
+
+        int col1 = actionX;
+        int col2 = actionX + actionWidth + actionGap;
+
+        addRenderableWidget(
+                actionButton(
+                        col1, top, actionWidth,
+                        tr("soundculling.ui.button.never_cull"), hasSelection,
+                        () -> addRule(selectedSoundId, "NEVER_CULL")
+                )
+        );
+
+        addRenderableWidget(
+                actionButton(
+                        col2, top, actionWidth,
+                        tr("soundculling.ui.button.high_priority"), hasSelection,
+                        () -> addRule(selectedSoundId, "HIGH")
+                )
+        );
+
+        addRenderableWidget(
+                actionButton(
+                        col1, top + 22, actionWidth,
+                        tr("soundculling.ui.button.aggressive"), hasSelection,
+                        () -> addRule(selectedSoundId, "AGGRESSIVE")
+                )
+        );
+
+        addRenderableWidget(
+                actionButton(
+                        col2, top + 22, actionWidth,
+                        tr("soundculling.ui.button.always_cull"), hasSelection,
+                        () -> addRule(selectedSoundId, "ALWAYS_CULL")
+                )
+        );
+
+        addRenderableWidget(
+                actionButton(
+                        col1, top + 44, actionWidth,
+                        tr("soundculling.ui.button.protect_mod"), hasSelection,
+                        () -> addRule(
+                                SoundRuleEngine.namespacePattern(selectedSoundId),
+                                "NEVER_CULL"
+                        )
+                )
+        );
+
+        addRenderableWidget(
+                actionButton(
+                        col2, top + 44, actionWidth,
+                        tr("soundculling.ui.button.clear_rule"), hasSelection,
+                        () -> removeRule(selectedSoundId)
+                )
+        );
+
+        addRenderableWidget(
+                ModernButton.create(
+                        Component.literal(tr("soundculling.ui.button.refresh")),
+                        button -> refreshUI()
+                ).bounds(
+                        actionX,
+                        top + 70,
+                        actionAreaWidth,
+                        18
+                ).build()
+        );
+    }
+
+    private Button actionButton(
+            int x,
+            int y,
+            int width,
+            String label,
+            boolean active,
+            Runnable action
+    ) {
+        Button button = ModernButton.create(
+                Component.literal(label),
+                ignored -> {
+                    if (active) {
+                        action.run();
+                        refreshUI();
+                    }
+                }
+        ).bounds(x, y, width, 18).build();
+
+        button.active = active;
+        return button;
+    }
+
+    private void buildAdvanced(Layout layout) {
+        int left = layout.panelX + 14 + (layout.panelWidth / 2 - 188) / 2;
+        int right = layout.panelX + layout.panelWidth / 2 + 4 + (layout.panelWidth / 2 - 188) / 2;
+        int y = layout.panelY + 82;
+        int row = 24;
+
+        addNumRow(left, y, maxTotal, 1, 100,
+                value -> maxTotal = value,
+                tr("soundculling.ui.label.region_total"), tr("soundculling.ui.tooltip.region_total"));
+
+        addNumRow(left, y + row, windowTicks, 5, 200,
+                value -> windowTicks = value,
+                tr("soundculling.ui.label.window_ticks"), tr("soundculling.ui.tooltip.window_ticks"));
+
+        addNumRow(left, y + row * 2, regionSize, 2, 64,
+                value -> regionSize = value,
+                tr("soundculling.ui.label.region_size"), tr("soundculling.ui.tooltip.region_size"));
+
+        addNumRow(left, y + row * 3, neighborRadius, 0, 2,
+                value -> neighborRadius = value,
+                tr("soundculling.ui.label.neighbour_cells"), tr("soundculling.ui.tooltip.neighbour_cells"));
+
+        addToggle(
+                right, y,
+                tr("soundculling.ui.label.directional_priority"),
+                directionalPriority,
+                value -> directionalPriority = value
+        );
+
+        addToggle(
+                right, y + row,
+                tr("soundculling.ui.label.distance_priority"),
+                distancePriority,
+                value -> distancePriority = value
+        );
+
+        addToggle(
+                right, y + row * 2,
+                tr("soundculling.ui.label.debug_logging"),
+                debugLogging,
+                value -> debugLogging = value
+        );
+
+        addRenderableWidget(
+                ModernButton.create(
+                        Component.literal(tr("soundculling.ui.button.factory_defaults")),
+                        button -> {
+                            applyLocalPreset("BALANCED");
+                            windowTicks = 20;
+                            regionSize = 16;
+                            neighborRadius = 1;
+                            debugLogging = false;
+                            directionalPriority = true;
+                            distancePriority = true;
+                            protectPlayerSounds = true;
+
+                            rules.clear();
+                            rules.add(
+                                    new SoundCullingConfig.SoundRule(
+                                            "minecraft:entity.player.attack.*",
+                                            "CRITICAL"
+                                    )
+                            );
+                            rules.add(
+                                    new SoundCullingConfig.SoundRule(
+                                            "bettercombat:*",
+                                            "HIGH"
+                                    )
+                            );
+
+                            refreshUI();
+                        }
+                ).bounds(
+                        right, y + row * 3, 170, 18
+                ).build()
+        );
+    }
+
+    private void addToggle(int x, int y, String label, boolean value, BooleanSetter setter) {
+        addRenderableWidget(ModernButton.create(Component.literal(label + ": " + (value ? tr("soundculling.ui.state.on") : tr("soundculling.ui.state.off"))), button -> {
+            setter.set(!value);
+            markCustom();
+            refreshUI();
+        }).bounds(x, y, 170, 18).build());
+    }
+
+    private void addNumRow(int x, int y, int value, int min, int max,
+                           IntSetter setter, String label, String tooltip) {
+        addRenderableWidget(ModernButton.create(Component.literal("-"), button -> {
+            setter.set(Math.max(min, value - 1));
+            markCustom();
+            refreshUI();
+        }).bounds(x + 92, y, 18, 18).build());
+
+        addRenderableWidget(ModernButton.create(Component.literal("+"), button -> {
+            setter.set(Math.min(max, value + 1));
+            markCustom();
+            refreshUI();
+        }).bounds(x + 152, y, 18, 18)
+                .tooltip(Tooltip.create(Component.literal(tooltip)))
+                .build());
+    }
+
+    private void addRule(String pattern, String action) {
+        if (pattern == null || pattern.isBlank()) {
+            return;
+        }
+        rules.removeIf(rule -> rule != null && pattern.equalsIgnoreCase(rule.pattern));
+        rules.add(new SoundCullingConfig.SoundRule(pattern, SoundCullingConfig.normalizeAction(action)));
+        preset = "CUSTOM";
+        ruleStatus = tr("soundculling.ui.status.rule_set", pattern, actionLabel(action));
+    }
+
+    private void removeRule(String pattern) {
+        if (pattern == null || pattern.isBlank()) {
+            return;
+        }
+
+        boolean removedExact = rules.removeIf(
+                rule -> rule != null
+                        && pattern.equalsIgnoreCase(rule.pattern)
+        );
+
+        String removedPattern = removedExact ? pattern : null;
+
+        if (!removedExact) {
+            String namespacePattern =
+                    SoundRuleEngine.namespacePattern(pattern);
+
+            if (namespacePattern != null
+                    && !namespacePattern.isBlank()
+                    && !namespacePattern.equalsIgnoreCase(pattern)) {
+
+                boolean removedNamespace = rules.removeIf(
+                        rule -> rule != null
+                                && namespacePattern.equalsIgnoreCase(
+                                        rule.pattern
+                                )
+                );
+
+                if (removedNamespace) {
+                    removedPattern = namespacePattern;
+                }
+            }
+        }
+
+        preset = "CUSTOM";
+
+        ruleStatus = removedPattern != null
+                ? tr("soundculling.ui.status.rule_removed", removedPattern)
+                : tr("soundculling.ui.status.no_rule", pattern);
+    }
+    private void cyclePreset() {
+        String next = switch (preset == null ? "BALANCED" : preset) {
+            case "SUBTLE" -> "BALANCED";
+            case "BALANCED" -> "FARMING";
+            case "FARMING" -> "PERFORMANCE";
+            case "PERFORMANCE" -> "SUBTLE";
+            default -> "BALANCED";
+        };
+        applyLocalPreset(next);
+    }
+
+    private void applyLocalPreset(String value) {
+        switch (value) {
+            case "SUBTLE" -> {
+                preset = "SUBTLE";
+                maxTotal = 16;
+                limitHostile = 8;
+                limitNeutral = 8;
+                limitBlock = 12;
+                limitAmbient = 8;
+                limitDefault = 8;
+                adaptiveStart = 80;
+                adaptiveFull = 250;
+                adaptiveStrength = 0.65;
+                adaptiveCulling = true;
+            }
+            case "FARMING" -> {
+                preset = "FARMING";
+                maxTotal = 8;
+                limitHostile = 6;
+                limitNeutral = 2;
+                limitBlock = 3;
+                limitAmbient = 4;
+                limitDefault = 4;
+                adaptiveStart = 40;
+                adaptiveFull = 140;
+                adaptiveStrength = 0.90;
+                adaptiveCulling = true;
+            }
+            case "PERFORMANCE" -> {
+                preset = "PERFORMANCE";
+                maxTotal = 5;
+                limitHostile = 3;
+                limitNeutral = 2;
+                limitBlock = 3;
+                limitAmbient = 2;
+                limitDefault = 2;
+                adaptiveStart = 25;
+                adaptiveFull = 90;
+                adaptiveStrength = 1.0;
+                adaptiveCulling = true;
+            }
+            default -> {
+                preset = "BALANCED";
+                maxTotal = 10;
+                limitHostile = 5;
+                limitNeutral = 5;
+                limitBlock = 7;
+                limitAmbient = 5;
+                limitDefault = 5;
+                adaptiveStart = 50;
+                adaptiveFull = 180;
+                adaptiveStrength = 0.80;
+                adaptiveCulling = true;
+            }
+        }
+    }
+
+    private void markCustom() {
+        preset = "CUSTOM";
+    }
+
+    private String presetTooltip() {
+        String normalized =
+                preset == null || preset.isBlank() ? "BALANCED" : preset.toUpperCase(Locale.ROOT);
+        String descKey =
+                switch (normalized) {
+                    case "SUBTLE" -> "soundculling.ui.preset.subtle.desc";
+                    case "FARMING" -> "soundculling.ui.preset.farming.desc";
+                    case "PERFORMANCE" -> "soundculling.ui.preset.performance.desc";
+                    case "CUSTOM" -> "soundculling.ui.preset.custom.desc";
+                    default -> "soundculling.ui.preset.balanced.desc";
+                };
+        return tr(descKey) + "\n\n§8" + tr("soundculling.ui.tooltip.preset_cycle");
+    }
+
+    private String prettyPreset() {
+        String normalized =
+                preset == null || preset.isBlank()
+                        ? "BALANCED"
+                        : preset.toUpperCase(Locale.ROOT);
+
+        return switch (normalized) {
+            case "SUBTLE" -> tr("soundculling.ui.preset.subtle");
+            case "BALANCED" -> tr("soundculling.ui.preset.balanced");
+            case "FARMING" -> tr("soundculling.ui.preset.farming");
+            case "PERFORMANCE" -> tr("soundculling.ui.preset.performance");
+            case "CUSTOM" -> tr("soundculling.ui.preset.custom");
+            default -> preset;
+        };
+    }
+
+    @Override
+    public void render(
+            GuiGraphics extractor,
+            int mouseX,
+            int mouseY,
+            float delta
+    ) {
+        super.render(extractor, mouseX, mouseY, delta);
+
+        Layout layout = layout();
+
+        String title = tr("soundculling.ui.title");
+        String subtitle = tr("soundculling.ui.subtitle");
+
+        extractor.drawString(
+                font,
+                Component.literal(title),
+                layout.panelX + 14,
+                layout.panelY + 11,
+                0xFFF4F7FB
+        );
+
+        if (layout.panelWidth >= 420) {
+            extractor.drawString(
+                    font,
+                    Component.literal(subtitle),
+                    layout.panelX
+                            + layout.panelWidth
+                            - font.width(subtitle)
+                            - 14,
+                    layout.panelY + 11,
+                    0xFF8290A0
+            );
+        }
+
+        int tabGap = 4;
+        int tabX = layout.panelX + 14;
+        int tabY = layout.panelY + 36;
+        int tabWidth =
+                (layout.panelWidth - 28 - tabGap * 3) / 4;
+
+        int selectedIndex = switch (page) {
+            case OVERVIEW -> 0;
+            case PERFORMANCE -> 1;
+            case LIVE -> 2;
+            case ADVANCED -> 3;
+        };
+
+        int activeX =
+                tabX
+                        + selectedIndex
+                        * (tabWidth + tabGap);
+
+        extractor.fill(
+                activeX + 5,
+                tabY + 19,
+                activeX + tabWidth - 5,
+                tabY + 20,
+                0xFF55A7FF
+        );
+
+        extractor.hLine(
+                layout.panelX + 14,
+                layout.panelX + layout.panelWidth - 14,
+                layout.panelY + 63,
+                0xFF2B3540
+        );
+
+        switch (page) {
+            case OVERVIEW -> renderOverview(extractor, layout);
+            case PERFORMANCE -> renderPerformance(extractor, layout);
+            case LIVE -> renderLive(extractor, layout);
+            case ADVANCED -> renderAdvanced(extractor, layout);
+        }
+
+        renderModernControls(extractor, mouseX, mouseY, layout);
+    }
+
+
+    private void renderModernControls(
+            GuiGraphics extractor,
+            int mouseX,
+            int mouseY,
+            Layout layout
+    ) {
+        int tabGap = 4;
+        int tabX = layout.panelX + 14;
+        int tabY = layout.panelY + 36;
+        int tabWidth =
+                (layout.panelWidth - 28 - tabGap * 3) / 4;
+
+        drawModernButton(
+                extractor,
+                tabX,
+                tabY,
+                tabWidth,
+                20,
+                tr("soundculling.ui.tab.overview"),
+                page == Page.OVERVIEW,
+                true,
+                mouseX,
+                mouseY
+        );
+
+        drawModernButton(
+                extractor,
+                tabX + tabWidth + tabGap,
+                tabY,
+                tabWidth,
+                20,
+                tr("soundculling.ui.tab.performance"),
+                page == Page.PERFORMANCE,
+                true,
+                mouseX,
+                mouseY
+        );
+
+        drawModernButton(
+                extractor,
+                tabX + (tabWidth + tabGap) * 2,
+                tabY,
+                tabWidth,
+                20,
+                tr("soundculling.ui.tab.live"),
+                page == Page.LIVE,
+                true,
+                mouseX,
+                mouseY
+        );
+
+        drawModernButton(
+                extractor,
+                tabX + (tabWidth + tabGap) * 3,
+                tabY,
+                tabWidth,
+                20,
+                tr("soundculling.ui.tab.advanced"),
+                page == Page.ADVANCED,
+                true,
+                mouseX,
+                mouseY
+        );
+
+
+        int bottomY =
+                layout.panelY + layout.panelHeight - 25;
+
+        int saveWidth = 104;
+        int cancelWidth = 72;
+
+        int rightEdge =
+                layout.panelX + layout.panelWidth - 14;
+
+        int saveX =
+                rightEdge - saveWidth;
+
+        int cancelX =
+                saveX - 6 - cancelWidth;
+
+        drawModernButton(
+                extractor,
+                cancelX,
+                bottomY,
+                cancelWidth,
+                18,
+                tr("soundculling.ui.button.cancel"),
+                false,
+                true,
+                mouseX,
+                mouseY
+        );
+
+        drawModernButton(
+                extractor,
+                saveX,
+                bottomY,
+                saveWidth,
+                18,
+                tr("soundculling.ui.button.save_close"),
+                true,
+                true,
+                mouseX,
+                mouseY
+        );
+
+
+        switch (page) {
+
+            case OVERVIEW -> {
+                int x = layout.panelX + 24;
+                int y = layout.panelY + 78;
+                int w = 142;
+
+                drawToggleSkin(
+                        extractor,
+                        x,
+                        y,
+                        w,
+                        20,
+                        tr("soundculling.ui.label.sound_culling"),
+                        enabled,
+                        mouseX,
+                        mouseY
+                );
+
+                drawSelectorSkin(
+                        extractor,
+                        x,
+                        y + 28,
+                        w,
+                        20,
+                        tr("soundculling.ui.label.preset"),
+                        prettyPreset(),
+                        mouseX,
+                        mouseY
+                );
+
+                drawToggleSkin(
+                        extractor,
+                        x,
+                        y + 56,
+                        w,
+                        20,
+                        tr("soundculling.ui.label.adaptive_engine"),
+                        adaptiveCulling,
+                        mouseX,
+                        mouseY
+                );
+
+                drawModernButton(
+                        extractor,
+                        x,
+                        y + 84,
+                        w,
+                        20,
+                        tr("soundculling.ui.button.reset_stats"),
+                        false,
+                        true,
+                        mouseX,
+                        mouseY
+                );
+            }
+
+
+            case PERFORMANCE -> {
+                int left =
+                        layout.panelX + 14 + (layout.panelWidth / 2 - 188) / 2;
+
+                int right =
+                        layout.panelX
+                                + layout.panelWidth / 2
+                                + 4
+                                + (layout.panelWidth / 2 - 188) / 2;
+
+                int y =
+                        layout.panelY + 82;
+
+                int row = 24;
+
+                drawNumberControls(
+                        extractor, left, y,
+                        mouseX, mouseY
+                );
+
+                drawNumberControls(
+                        extractor, left, y + row,
+                        mouseX, mouseY
+                );
+
+                drawNumberControls(
+                        extractor, left, y + row * 2,
+                        mouseX, mouseY
+                );
+
+                drawNumberControls(
+                        extractor, left, y + row * 3,
+                        mouseX, mouseY
+                );
+
+                drawNumberControls(
+                        extractor, right, y,
+                        mouseX, mouseY
+                );
+
+                drawNumberControls(
+                        extractor, right, y + row,
+                        mouseX, mouseY
+                );
+
+                drawNumberControls(
+                        extractor, right, y + row * 2,
+                        mouseX, mouseY
+                );
+
+                drawToggleSkin(
+                        extractor,
+                        right, y + row * 3, 170, 18,
+                        tr("soundculling.ui.label.player_protection"),
+                        protectPlayerSounds,
+                        mouseX,
+                        mouseY
+                );
+            }
+
+
+            case LIVE -> {
+                int top =
+                        layout.panelY + 82;
+
+                int contentLeft =
+                        layout.panelX + 14;
+
+                int contentRight =
+                        layout.panelX + layout.panelWidth - 14;
+
+                int actionCardWidth = 188;
+                int actionCardX =
+                        contentRight - actionCardWidth;
+
+                int innerPad = 8;
+
+                int left =
+                        contentLeft + innerPad;
+
+                int leftCardRight =
+                        actionCardX - 7;
+
+                int actionWidth = 82;
+                int actionGap = 8;
+
+                int actionAreaWidth =
+                        actionWidth * 2 + actionGap;
+
+                int actionX =
+                        actionCardX
+                                + (actionCardWidth - actionAreaWidth) / 2;
+
+                int listWidth =
+                        Math.max(
+                                150,
+                                leftCardRight - left - innerPad
+                        );
+
+                int maxRecent =
+                        layout.panelHeight >= 270
+                                ? 6
+                                : 5;
+
+                List<SoundCullingTracker.RecentSoundSnapshot> recent =
+                        SoundCullingTracker.getRecentSounds(maxRecent);
+
+                int listY = top;
+
+                for (SoundCullingTracker.RecentSoundSnapshot sound : recent) {
+                    boolean selected =
+                            sound.soundId()
+                                    .equals(selectedSoundId);
+
+                    drawLiveSoundRow(
+                            extractor,
+                            left,
+                            listY,
+                            listWidth,
+                            18,
+                            sound,
+                            selected,
+                            mouseX,
+                            mouseY
+                    );
+
+                    listY += 21;
+                }
+
+                boolean hasSelection =
+                        selectedSoundId != null
+                                && !selectedSoundId.isBlank();
+
+                int col1 = actionX;
+                int col2 =
+                        actionX
+                                + actionWidth
+                                + actionGap;
+
+                drawModernButton(
+                        extractor,
+                        col1,
+                        top,
+                        actionWidth,
+                        18,
+                        tr("soundculling.ui.button.never_cull"),
+                        false,
+                        hasSelection,
+                        mouseX,
+                        mouseY
+                );
+
+                drawModernButton(
+                        extractor,
+                        col2,
+                        top,
+                        actionWidth,
+                        18,
+                        tr("soundculling.ui.button.high_priority"),
+                        false,
+                        hasSelection,
+                        mouseX,
+                        mouseY
+                );
+
+                drawModernButton(
+                        extractor,
+                        col1,
+                        top + 22,
+                        actionWidth,
+                        18,
+                        tr("soundculling.ui.button.aggressive"),
+                        false,
+                        hasSelection,
+                        mouseX,
+                        mouseY
+                );
+
+                drawModernButton(
+                        extractor,
+                        col2,
+                        top + 22,
+                        actionWidth,
+                        18,
+                        tr("soundculling.ui.button.always_cull"),
+                        false,
+                        hasSelection,
+                        mouseX,
+                        mouseY
+                );
+
+                drawModernButton(
+                        extractor,
+                        col1,
+                        top + 44,
+                        actionWidth,
+                        18,
+                        tr("soundculling.ui.button.protect_mod"),
+                        false,
+                        hasSelection,
+                        mouseX,
+                        mouseY
+                );
+
+                drawModernButton(
+                        extractor,
+                        col2,
+                        top + 44,
+                        actionWidth,
+                        18,
+                        tr("soundculling.ui.button.clear_rule"),
+                        false,
+                        hasSelection,
+                        mouseX,
+                        mouseY
+                );
+
+                drawModernButton(
+                        extractor,
+                        actionX,
+                        top + 70,
+                        actionAreaWidth,
+                        18,
+                        tr("soundculling.ui.button.refresh"),
+                        false,
+                        true,
+                        mouseX,
+                        mouseY
+                );
+            }
+
+
+            case ADVANCED -> {
+                int left =
+                        layout.panelX + 14 + (layout.panelWidth / 2 - 188) / 2;
+
+                int right =
+                        layout.panelX
+                                + layout.panelWidth / 2
+                                + 4
+                                + (layout.panelWidth / 2 - 188) / 2;
+
+                int y =
+                        layout.panelY + 82;
+
+                int row = 24;
+
+                drawNumberControls(
+                        extractor, left, y,
+                        mouseX, mouseY
+                );
+
+                drawNumberControls(
+                        extractor, left, y + row,
+                        mouseX, mouseY
+                );
+
+                drawNumberControls(
+                        extractor, left, y + row * 2,
+                        mouseX, mouseY
+                );
+
+                drawNumberControls(
+                        extractor, left, y + row * 3,
+                        mouseX, mouseY
+                );
+
+                drawToggleSkin(
+                        extractor,
+                        right,
+                        y,
+                        170,
+                        18,
+                        tr("soundculling.ui.label.directional_priority"),
+                        directionalPriority,
+                        mouseX,
+                        mouseY
+                );
+
+                drawToggleSkin(
+                        extractor,
+                        right,
+                        y + row,
+                        170,
+                        18,
+                        tr("soundculling.ui.label.distance_priority"),
+                        distancePriority,
+                        mouseX,
+                        mouseY
+                );
+
+                drawToggleSkin(
+                        extractor,
+                        right,
+                        y + row * 2,
+                        170,
+                        18,
+                        tr("soundculling.ui.label.debug_logging"),
+                        debugLogging,
+                        mouseX,
+                        mouseY
+                );
+
+                drawModernButton(
+                        extractor,
+                        right, y + row * 3, 170, 18,
+                        tr("soundculling.ui.button.factory_defaults"),
+                        false,
+                        true,
+                        mouseX,
+                        mouseY
+                );
+            }
+        }
+    }
+
+
+    private void drawNumberControls(
+            GuiGraphics extractor,
+            int x,
+            int y,
+            int mouseX,
+            int mouseY
+    ) {
+        drawModernButton(
+                extractor,
+                x + 92,
+                y,
+                18,
+                18,
+                "-",
+                false,
+                true,
+                mouseX,
+                mouseY
+        );
+
+        drawModernButton(
+                extractor,
+                x + 152,
+                y,
+                18,
+                18,
+                "+",
+                false,
+                true,
+                mouseX,
+                mouseY
+        );
+    }
+
+
+    private void drawToggleSkin(
+            GuiGraphics extractor,
+            int x,
+            int y,
+            int width,
+            int height,
+            String label,
+            boolean state,
+            int mouseX,
+            int mouseY
+    ) {
+        boolean hover =
+                isInside(
+                        mouseX,
+                        mouseY,
+                        x,
+                        y,
+                        width,
+                        height
+                );
+
+        int border =
+                state
+                        ? 0xFF55A7FF
+                        : 0xFF374352;
+
+        int background =
+                hover
+                        ? 0xFF283545
+                        : 0xFF202833;
+
+        extractor.fill(
+                x,
+                y,
+                x + width,
+                y + height,
+                border
+        );
+
+        extractor.fill(
+                x + 1,
+                y + 1,
+                x + width - 1,
+                y + height - 1,
+                background
+        );
+
+        extractor.drawString(
+                font,
+                Component.literal(label),
+                x + 8,
+                y + 5,
+                0xFFE6EBF1
+        );
+
+        String stateText =
+                state ? tr("soundculling.ui.state.on") : tr("soundculling.ui.state.off");
+
+        int pillWidth = 29;
+        int pillHeight = 12;
+
+        int pillX =
+                x + width - pillWidth - 8;
+
+        int pillY =
+                y + (height - pillHeight) / 2;
+
+        int pillColor =
+                state
+                        ? 0xFF24679B
+                        : 0xFF343E49;
+
+        extractor.fill(
+                pillX,
+                pillY,
+                pillX + pillWidth,
+                pillY + pillHeight,
+                pillColor
+        );
+
+        extractor.drawString(
+                font,
+                Component.literal(stateText),
+                pillX
+                        + (pillWidth - font.width(stateText)) / 2,
+                pillY + 2,
+                state
+                        ? 0xFFFFFFFF
+                        : 0xFFADB5BE
+        );
+    }
+
+
+    private void drawSelectorSkin(
+            GuiGraphics extractor,
+            int x,
+            int y,
+            int width,
+            int height,
+            String label,
+            String value,
+            int mouseX,
+            int mouseY
+    ) {
+        boolean hover =
+                isInside(
+                        mouseX,
+                        mouseY,
+                        x,
+                        y,
+                        width,
+                        height
+                );
+
+        extractor.fill(
+                x,
+                y,
+                x + width,
+                y + height,
+                0xFF374352
+        );
+
+        extractor.fill(
+                x + 1,
+                y + 1,
+                x + width - 1,
+                y + height - 1,
+                hover
+                        ? 0xFF283545
+                        : 0xFF202833
+        );
+
+        extractor.drawString(
+                font,
+                Component.literal(label),
+                x + 8,
+                y + 5,
+                0xFF9DA8B4
+        );
+
+        extractor.drawString(
+                font,
+                Component.literal(value),
+                x
+                        + width
+                        - font.width(value)
+                        - 8,
+                y + 5,
+                0xFF65B5FF
+        );
+    }
+
+
+    private void drawLiveSoundRow(
+            GuiGraphics extractor,
+            int x,
+            int y,
+            int width,
+            int height,
+            SoundCullingTracker.RecentSoundSnapshot sound,
+            boolean selected,
+            int mouseX,
+            int mouseY
+    ) {
+        drawModernButton(
+                extractor,
+                x,
+                y,
+                width,
+                height,
+                "",
+                selected,
+                true,
+                mouseX,
+                mouseY
+        );
+
+        String triggeredText =
+                "x" + sound.triggered();
+
+        String culledText =
+                "c" + sound.culled();
+
+        int padding = 7;
+        int counterGap = 10;
+        int idGap = 10;
+
+        int culledX =
+                x
+                        + width
+                        - padding
+                        - font.width(culledText);
+
+        int triggeredX =
+                culledX
+                        - counterGap
+                        - font.width(triggeredText);
+
+        int idX =
+                x + padding;
+
+        int idAvailableWidth =
+                Math.max(
+                        0,
+                        triggeredX
+                                - idGap
+                                - idX
+                );
+
+        String visibleId =
+                trimToPixelWidth(
+                        sound.soundId(),
+                        idAvailableWidth
+                );
+
+        int textY =
+                y
+                        + Math.max(
+                                2,
+                                (height - 8) / 2
+                        );
+
+        int idColor =
+                selected
+                        ? 0xFFFFFFFF
+                        : 0xFFE8EDF2;
+
+        extractor.drawString(
+                font,
+                Component.literal(visibleId),
+                idX,
+                textY,
+                idColor
+        );
+
+        extractor.drawString(
+                font,
+                Component.literal(triggeredText),
+                triggeredX,
+                textY,
+                selected
+                        ? 0xFFFFFFFF
+                        : 0xFFB6C0CA
+        );
+
+        extractor.drawString(
+                font,
+                Component.literal(culledText),
+                culledX,
+                textY,
+                sound.culled() > 0
+                        ? 0xFFFFA0A0
+                        : (
+                        selected
+                                ? 0xFFFFFFFF
+                                : 0xFF9DA8B4
+                )
+        );
+    }
+
+
+    private String trimToPixelWidth(
+            String text,
+            int maxWidth
+    ) {
+        if (text == null
+                || text.isEmpty()
+                || maxWidth <= 0) {
+            return "";
+        }
+
+        if (font.width(text) <= maxWidth) {
+            return text;
+        }
+
+        String ellipsis = "...";
+        int ellipsisWidth =
+                font.width(ellipsis);
+
+        if (ellipsisWidth > maxWidth) {
+            return "";
+        }
+
+        int end =
+                text.length();
+
+        while (end > 0) {
+            String candidate =
+                    text.substring(0, end)
+                            + ellipsis;
+
+            if (font.width(candidate) <= maxWidth) {
+                return candidate;
+            }
+
+            end--;
+        }
+
+        return ellipsis;
+    }
+
+    private void drawModernButton(
+            GuiGraphics extractor,
+            int x,
+            int y,
+            int width,
+            int height,
+            String label,
+            boolean accent,
+            boolean active,
+            int mouseX,
+            int mouseY
+    ) {
+        boolean hover =
+                active
+                        && isInside(
+                                mouseX,
+                                mouseY,
+                                x,
+                                y,
+                                width,
+                                height
+                        );
+
+        int border;
+        int background;
+        int textColor;
+
+        if (!active) {
+            border = 0xFF252C34;
+            background = 0xFF171C22;
+            textColor = 0xFF66717C;
+        } else if (accent) {
+            border = 0xFF55A7FF;
+            background =
+                    hover
+                            ? 0xFF28577E
+                            : 0xFF214866;
+            textColor = 0xFFFFFFFF;
+        } else {
+            border = 0xFF374352;
+            background =
+                    hover
+                            ? 0xFF2A3746
+                            : 0xFF202833;
+            textColor = 0xFFE8EDF2;
+        }
+
+        extractor.fill(
+                x,
+                y,
+                x + width,
+                y + height,
+                border
+        );
+
+        extractor.fill(
+                x + 1,
+                y + 1,
+                x + width - 1,
+                y + height - 1,
+                background
+        );
+
+        String text = label == null ? "" : label;
+
+        int maxTextWidth =
+                Math.max(8, width - 12);
+
+        if (font.width(text) > maxTextWidth) {
+            String source = text;
+            String suffix = "...";
+            int end = source.length();
+
+            while (end > 1
+                    && font.width(
+                            source.substring(0, end) + suffix
+                    ) > maxTextWidth) {
+                end--;
+            }
+
+            text =
+                    source.substring(
+                            0,
+                            Math.max(1, end)
+                    ) + suffix;
+        }
+
+        extractor.drawString(
+                font,
+                Component.literal(text),
+                x + (width - font.width(text)) / 2,
+                y + Math.max(
+                        2,
+                        (height - 8) / 2
+                ),
+                textColor
+        );
+    }
+
+    private boolean isInside(
+            int mouseX,
+            int mouseY,
+            int x,
+            int y,
+            int width,
+            int height
+    ) {
+        return mouseX >= x
+                && mouseX < x + width
+                && mouseY >= y
+                && mouseY < y + height;
+    }
+    private void renderOverview(
+            GuiGraphics extractor,
+            Layout layout
+    ) {
+        int cardX = layout.panelX + 192;
+        int cardY = layout.panelY + 78;
+        int cardWidth = layout.panelWidth - 216;
+
+        int cardHeight = 20;
+        int gap = 8;
+
+        drawStatCard(
+                extractor,
+                cardX,
+                cardY,
+                cardWidth,
+                cardHeight,
+                tr("soundculling.ui.stat.sound_rate"),
+                tr("soundculling.ui.value.per_second", SoundCullingTracker.getEventsPerSecond())
+        );
+
+        drawStatCard(
+                extractor,
+                cardX,
+                cardY + (cardHeight + gap),
+                cardWidth,
+                cardHeight,
+                tr("soundculling.ui.stat.adaptive_pressure"),
+                Math.round(
+                        SoundCullingTracker.getAdaptivePressure() * 100.0f
+                ) + "%"
+        );
+
+        drawStatCard(
+                extractor,
+                cardX,
+                cardY + (cardHeight + gap) * 2,
+                cardWidth,
+                cardHeight,
+                tr("soundculling.ui.stat.culled_session"),
+                String.valueOf(
+                        SoundCullingTracker.getTotalCulled()
+                )
+        );
+
+        drawStatCard(
+                extractor,
+                cardX,
+                cardY + (cardHeight + gap) * 3,
+                cardWidth,
+                cardHeight,
+                tr("soundculling.ui.stat.dampened"),
+                String.valueOf(
+                        SoundCullingTracker.getTotalDampened()
+                )
+        );
+    }
+
+    private void renderPerformance(
+            GuiGraphics extractor,
+            Layout layout
+    ) {
+        int left = layout.panelX + 14 + (layout.panelWidth / 2 - 188) / 2;
+        int right = layout.panelX + layout.panelWidth / 2 + 4 + (layout.panelWidth / 2 - 188) / 2;
+        int y = layout.panelY + 82;
+        int row = 24;
+
+        renderValue(extractor, left, y,
+                tr("soundculling.ui.label.adaptive_start"), tr("soundculling.ui.value.per_second", adaptiveStart));
+
+        renderValue(extractor, left, y + row,
+                tr("soundculling.ui.label.adaptive_full"), tr("soundculling.ui.value.per_second", adaptiveFull));
+
+        renderValue(extractor, left, y + row * 2,
+                tr("soundculling.ui.label.default"), String.valueOf(limitDefault));
+
+        renderValue(extractor, left, y + row * 3,
+                tr("soundculling.ui.label.blocks"), String.valueOf(limitBlock));
+
+        renderValue(extractor, right, y,
+                tr("soundculling.ui.label.hostile"), String.valueOf(limitHostile));
+
+        renderValue(extractor, right, y + row,
+                tr("soundculling.ui.label.neutral"), String.valueOf(limitNeutral));
+
+        renderValue(extractor, right, y + row * 2,
+                tr("soundculling.ui.label.ambient"), String.valueOf(limitAmbient));
+    }
+
+    private void renderLive(
+            GuiGraphics extractor,
+            Layout layout
+    ) {
+        int contentLeft = layout.panelX + 14;
+        int contentRight = layout.panelX + layout.panelWidth - 14;
+
+        int actionCardWidth = 188;
+        int actionCardX = contentRight - actionCardWidth;
+        int leftCardRight = actionCardX - 7;
+        int innerPad = 8;
+
+        int headerY = layout.panelY + 73;
+
+        String recentTitle = tr("soundculling.ui.live.recent_sounds");
+
+        int recentTitleX =
+                contentLeft
+                        + (leftCardRight
+                        - contentLeft
+                        - font.width(recentTitle)) / 2;
+
+        extractor.drawString(
+                font,
+                Component.literal(recentTitle),
+                recentTitleX,
+                headerY,
+                0xFFAAB4C0
+        );
+
+        String actionTitle;
+        int actionTitleColor;
+
+        if (selectedSoundId != null && !selectedSoundId.isBlank()) {
+            actionTitle = trim(selectedSoundId, 22);
+            actionTitleColor = 0xFF8FC7FF;
+        } else {
+            actionTitle = tr("soundculling.ui.live.select_sound");
+            actionTitleColor = 0xFF84909D;
+        }
+
+        int actionTitleX =
+                actionCardX
+                        + (actionCardWidth
+                        - font.width(actionTitle)) / 2;
+
+        extractor.drawString(
+                font,
+                Component.literal(actionTitle),
+                actionTitleX,
+                headerY,
+                actionTitleColor
+        );
+
+        if (!ruleStatus.isBlank()) {
+            extractor.drawString(
+                    font,
+                    Component.literal(trim(ruleStatus, 48)),
+                    contentLeft + innerPad,
+                    layout.panelY
+                            + layout.panelHeight
+                            - 49,
+                    0xFF7EE787
+            );
+        }
+    }
+
+    private void renderAdvanced(
+            GuiGraphics extractor,
+            Layout layout
+    ) {
+        int left = layout.panelX + 14 + (layout.panelWidth / 2 - 188) / 2;
+        int right = layout.panelX + layout.panelWidth / 2 + 4 + (layout.panelWidth / 2 - 188) / 2;
+        int y = layout.panelY + 82;
+        int row = 24;
+
+        renderValue(
+                extractor,
+                left,
+                y,
+                tr("soundculling.ui.label.region_total"),
+                String.valueOf(maxTotal)
+        );
+
+        renderValue(
+                extractor,
+                left,
+                y + row,
+                tr("soundculling.ui.label.window_ticks"),
+                String.valueOf(windowTicks)
+        );
+
+        renderValue(
+                extractor,
+                left,
+                y + row * 2,
+                tr("soundculling.ui.label.region_size"),
+                tr("soundculling.ui.value.blocks", regionSize)
+        );
+
+        renderValue(
+                extractor,
+                left,
+                y + row * 3,
+                tr("soundculling.ui.label.neighbour_cells"),
+                String.valueOf(neighborRadius)
+        );
+
+        int statsY = y + row * 4;
+
+        String rulesText =
+                tr("soundculling.ui.advanced.rules", rules.size());
+
+        String regionsText =
+                tr(
+                        "soundculling.ui.advanced.tracked_regions",
+                        SoundCullingTracker.getTrackedRegionCount()
+                );
+
+        extractor.drawString(
+                font,
+                Component.literal(rulesText),
+                right + (170 - font.width(rulesText)) / 2,
+                statsY,
+                0xFF84909D
+        );
+
+        extractor.drawString(
+                font,
+                Component.literal(regionsText),
+                right + (170 - font.width(regionsText)) / 2,
+                statsY + 13,
+                0xFF84909D
+        );
+    }
+
+    private void drawStatCard(
+            GuiGraphics extractor,
+            int x,
+            int y,
+            int width,
+            int height,
+            String label,
+            String value
+    ) {
+        extractor.fill(
+                x,
+                y,
+                x + width,
+                y + height,
+                0xFF1D2530
+        );
+
+        extractor.fill(
+                x,
+                y,
+                x + 2,
+                y + height,
+                0xFF55A7FF
+        );
+
+        extractor.drawString(
+                font,
+                Component.literal(label),
+                x + 10,
+                y + 6,
+                0xFF98A5B3
+        );
+
+        extractor.drawString(
+                font,
+                Component.literal(value),
+                x + width - font.width(value) - 10,
+                y + 6,
+                0xFFF7F9FB
+        );
+    }
+
+    private void renderValue(
+            GuiGraphics extractor,
+            int x,
+            int y,
+            String label,
+            String value
+    ) {
+        extractor.drawString(
+                font,
+                Component.literal(label),
+                x,
+                y + 5,
+                0xFFC5CDD6
+        );
+
+        extractor.drawString(
+                font,
+                Component.literal(value),
+                x + 131 - font.width(value) / 2,
+                y + 5,
+                0xFFFFFFFF
         );
     }
 
     @Override
-    public void render(GuiGraphics g, int mouseX, int mouseY, float delta) {
-        this.renderBackground(g, mouseX, mouseY, delta);
-        super.render(g, mouseX, mouseY, delta);
+    public void renderBackground(
+            GuiGraphics extractor,
+            int mouseX,
+            int mouseY,
+            float delta
+    ) {
+        super.renderBackground(extractor, mouseX, mouseY, delta);
 
-        g.pose().pushPose();
-        g.pose().translate(0, 0, 200);
+        Layout layout = layout();
 
-        int cx = this.width / 2;
-        int leftX = cx - COL_W - COL_GAP / 2;
-        int rightX = cx + COL_GAP / 2;
-        int topY = 50;
-        int rowH = 22;
+        extractor.fill(
+                0, 0, width, height,
+                0xD6080A0E
+        );
 
-        g.drawCenteredString(this.font, Component.literal("§6§lDynamic Sound Culling"), cx, 10, 0xFFFFCC00);
-        g.drawCenteredString(this.font, Component.literal("§7Configure sound culling behavior"), cx, 24, 0xFFAAAAAA);
+        extractor.fill(
+                layout.panelX + 4,
+                layout.panelY + 5,
+                layout.panelX + layout.panelWidth + 4,
+                layout.panelY + layout.panelHeight + 5,
+                0x70000000
+        );
 
-        g.drawString(this.font, Component.literal("§b§lSystem"), leftX, topY - 12, 0xFF00E5FF);
-        g.fill(leftX, topY - 1, leftX + COL_W, topY, 0xFF555555);
+        extractor.fill(
+                layout.panelX,
+                layout.panelY,
+                layout.panelX + layout.panelWidth,
+                layout.panelY + layout.panelHeight,
+                0xF410141A
+        );
 
-        g.drawString(this.font, Component.literal("§6Max Sounds/Region"), leftX, topY + 4, 0xFFFFD740);
-        g.drawString(this.font, Component.literal("§bTime Window"), leftX, topY + rowH + 4, 0xFF40C4FF);
-        g.drawString(this.font, Component.literal("§5Region Size"), leftX, topY + rowH * 2 + 4, 0xFFB388FF);
-        g.drawString(this.font, Component.literal("§dDebug Mode"), leftX, topY + rowH * 3 + 4, 0xFFFF80AB);
+        extractor.fill(
+                layout.panelX,
+                layout.panelY,
+                layout.panelX + layout.panelWidth,
+                layout.panelY + 31,
+                0xFF171D25
+        );
 
-        drawVal(g, leftX, topY, maxTotal, "§6");
-        drawVal(g, leftX, topY + rowH, windowTicks + "t", "§b");
-        drawVal(g, leftX, topY + rowH * 2, regionSize + "b", "§5");
+        extractor.fill(
+                layout.panelX,
+                layout.panelY,
+                layout.panelX + layout.panelWidth,
+                layout.panelY + 2,
+                0xFF55A7FF
+        );
 
-        g.drawString(this.font, Component.literal("§a§lLimits"), rightX, topY - 12, 0xFF76FF03);
-        g.fill(rightX, topY - 1, rightX + COL_W, topY, 0xFF555555);
+        int contentTop = layout.panelY + 72;
+        int contentBottom = layout.panelY + layout.panelHeight - 38;
 
-        g.drawString(this.font, Component.literal("§cHostile Mobs"), rightX, topY + 4, 0xFFFF5252);
-        g.drawString(this.font, Component.literal("§aNeutral Mobs"), rightX, topY + rowH + 4, 0xFF69F0AE);
-        g.drawString(this.font, Component.literal("§6Blocks"), rightX, topY + rowH * 2 + 4, 0xFFFFAB40);
-        g.drawString(this.font, Component.literal("§9Ambient"), rightX, topY + rowH * 3 + 4, 0xFF448AFF);
-        g.drawString(this.font, Component.literal("§dDefault"), rightX, topY + rowH * 4 + 4, 0xFFE040FB);
+        switch (page) {
+            case OVERVIEW -> {
+                extractor.fill(
+                        layout.panelX + 14,
+                        contentTop,
+                        layout.panelX + 176,
+                        contentBottom,
+                        0xB8171D25
+                );
 
-        drawVal(g, rightX, topY, limitHostile, "§c");
-        drawVal(g, rightX, topY + rowH, limitNeutral, "§a");
-        drawVal(g, rightX, topY + rowH * 2, limitBlock, "§6");
-        drawVal(g, rightX, topY + rowH * 3, limitAmbient, "§9");
-        drawVal(g, rightX, topY + rowH * 4, limitDefault, "§d");
+                extractor.fill(
+                        layout.panelX + 182,
+                        contentTop,
+                        layout.panelX + layout.panelWidth - 14,
+                        contentBottom,
+                        0xB8171D25
+                );
+            }
 
-        int sepY = this.height - 42;
-        g.fill(cx - 180, sepY, cx + 180, sepY + 1, 0xFF555555);
-        String stats = "§a" + SoundCullingTracker.getTotalCulled() + " sounds culled this session";
-        g.drawCenteredString(this.font, Component.literal(stats), cx, sepY + 6, 0xFF69F0AE);
+            case PERFORMANCE -> {
+                int middle = layout.panelX + layout.panelWidth / 2;
 
-        g.pose().popPose();
+                extractor.fill(
+                        layout.panelX + 14,
+                        contentTop,
+                        middle - 4,
+                        contentBottom,
+                        0xB8171D25
+                );
+
+                extractor.fill(
+                        middle + 4,
+                        contentTop,
+                        layout.panelX + layout.panelWidth - 14,
+                        contentBottom,
+                        0xB8171D25
+                );
+            }
+
+            case LIVE -> {
+                int actionWidth = 188;
+                int actionX =
+                        layout.panelX
+                                + layout.panelWidth
+                                - actionWidth
+                                - 14;
+
+                extractor.fill(
+                        layout.panelX + 14,
+                        contentTop,
+                        actionX - 7,
+                        contentBottom,
+                        0xB8171D25
+                );
+
+                extractor.fill(
+                        actionX,
+                        contentTop,
+                        layout.panelX + layout.panelWidth - 14,
+                        contentBottom,
+                        0xB8171D25
+                );
+            }
+
+            case ADVANCED -> {
+                int middle = layout.panelX + layout.panelWidth / 2;
+
+                extractor.fill(
+                        layout.panelX + 14,
+                        contentTop,
+                        middle - 4,
+                        contentBottom,
+                        0xB8171D25
+                );
+
+                extractor.fill(
+                        middle + 4,
+                        contentTop,
+                        layout.panelX + layout.panelWidth - 14,
+                        contentBottom,
+                        0xB8171D25
+                );
+            }
+        }
+
+        extractor.fill(
+                layout.panelX,
+                layout.panelY + layout.panelHeight - 34,
+                layout.panelX + layout.panelWidth,
+                layout.panelY + layout.panelHeight,
+                0xFF13181F
+        );
     }
 
-    private void drawVal(GuiGraphics g, int colX, int y, Object val, String colorCode) {
-        String s = String.valueOf(val);
-        g.drawString(this.font, Component.literal(colorCode + s),
-                colX + 130 - this.font.width(s) / 2, y + 4, 0xFFFFFFFF);
-    }
-
-    private void saveToConfig() {
+    private void applyAndSave() {
+        config.enabled = enabled;
+        config.preset = preset;
+        config.adaptiveCulling = adaptiveCulling;
+        config.adaptiveStartPerSecond = adaptiveStart;
+        config.adaptiveFullPerSecond = adaptiveFull;
+        config.adaptiveStrength = adaptiveStrength;
         config.maxTotalPerRegion = maxTotal;
         config.windowTicks = windowTicks;
         config.regionSize = regionSize;
+        config.spatialNeighborRadius = neighborRadius;
         config.debugLogging = debugLogging;
+        config.directionalPriority = directionalPriority;
+        config.distancePriority = distancePriority;
+        config.protectPlayerSounds = protectPlayerSounds;
+
         config.limitHostile = limitHostile;
         config.limitNeutral = limitNeutral;
         config.limitBlock = limitBlock;
         config.limitAmbient = limitAmbient;
         config.limitDefault = limitDefault;
+
+        config.rules = new ArrayList<>();
+        for (SoundCullingConfig.SoundRule rule : rules) {
+            if (rule != null) {
+                config.rules.add(rule.copy());
+            }
+        }
+
         config.save();
-        SoundCulling.LOGGER.info("[SoundCulling] Settings saved.");
+        SoundCulling.LOGGER.info("[SoundCulling] 2.0 settings saved.");
     }
 
     @Override
     public void onClose() {
-        Minecraft.getInstance().setScreen(this.parent);
+        Minecraft.getInstance().setScreen(parent);
+    }
+
+    private Layout layout() {
+        int panelWidth = Math.min(520, Math.max(360, width - 32));
+        int panelHeight = Math.min(280, Math.max(240, height - 24));
+
+        int panelX = (width - panelWidth) / 2;
+        int panelY = (height - panelHeight) / 2;
+
+        return new Layout(panelX, panelY, panelWidth, panelHeight);
+    }
+
+    private static String trim(String value, int max) {
+        if (value == null || value.length() <= max) {
+            return value == null ? "" : value;
+        }
+        return value.substring(0, Math.max(1, max - 1)) + "…";
+    }
+
+    private interface IntSetter {
+        void set(int value);
+    }
+
+    private interface BooleanSetter {
+        void set(boolean value);
+    }
+
+    private static final class ModernButton extends Button {
+        private ModernButton(
+                int x,
+                int y,
+                int width,
+                int height,
+                Component message,
+                OnPress onPress
+        ) {
+            super(x, y, width, height, message, onPress, DEFAULT_NARRATION);
+        }
+
+        private static Builder create(Component message, OnPress onPress) {
+            return new Builder(message, onPress);
+        }
+
+        @Override
+        protected void renderWidget(
+                GuiGraphics graphics,
+                int mouseX,
+                int mouseY,
+                float delta
+        ) {
+        }
+
+        private static final class Builder {
+            private final Component message;
+            private final OnPress onPress;
+            private int x;
+            private int y;
+            private int width;
+            private int height;
+            private Tooltip tooltip;
+
+            private Builder(Component message, OnPress onPress) {
+                this.message = message;
+                this.onPress = onPress;
+            }
+
+            private Builder bounds(int x, int y, int width, int height) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                return this;
+            }
+
+            private Builder tooltip(Tooltip tooltip) {
+                this.tooltip = tooltip;
+                return this;
+            }
+
+            private ModernButton build() {
+                ModernButton button = new ModernButton(
+                        x, y, width, height, message, onPress
+                );
+                if (tooltip != null) {
+                    button.setTooltip(tooltip);
+                }
+                return button;
+            }
+        }
+    }
+
+    private record Layout(int panelX, int panelY, int panelWidth, int panelHeight) {
     }
 }

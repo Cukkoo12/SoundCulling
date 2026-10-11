@@ -2,6 +2,7 @@ package com.cukkoo.soundculling;
 
 import com.cukkoo.soundculling.command.SoundCullingCommands;
 import com.cukkoo.soundculling.config.SoundCullingConfig;
+import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -10,6 +11,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,13 +25,12 @@ public class SoundCulling {
 
     public SoundCulling(IEventBus modEventBus, ModContainer container) {
         config = SoundCullingConfig.load();
-        LOGGER.info("[SoundCulling] NeoForge Initialized — max {}/sound, max {}/region total, window {} ticks, region {}blocks",
-                config.maxSoundsPerRegion, config.maxTotalPerRegion,
-                config.windowTicks, config.regionSize);
+        LOGGER.info("[SoundCulling] 2.1.0 engine initialized — preset={}, adaptive={}, region={} blocks",
+                config.preset, config.adaptiveCulling, config.regionSize);
 
         container.registerExtensionPoint(
-            net.neoforged.neoforge.client.gui.IConfigScreenFactory.class,
-            (mc, screen) -> new com.cukkoo.soundculling.integration.SoundCullingConfigScreen(screen)
+                IConfigScreenFactory.class,
+                (mc, screen) -> new com.cukkoo.soundculling.integration.SoundCullingConfigScreen(screen)
         );
     }
 
@@ -37,12 +38,18 @@ public class SoundCulling {
         return config;
     }
 
+    public static void setConfig(SoundCullingConfig newConfig) {
+        config = newConfig;
+        config.save();
+    }
+
     @EventBusSubscriber(modid = MOD_ID, value = Dist.CLIENT)
     public static class ClientEvents {
 
         @SubscribeEvent
         public static void onClientTick(ClientTickEvent.Post event) {
-            SoundCullingTracker.onTick();
+            Minecraft mc = Minecraft.getInstance();
+            SoundCullingTracker.onTick(mc != null && mc.level != null);
         }
 
         @SubscribeEvent
